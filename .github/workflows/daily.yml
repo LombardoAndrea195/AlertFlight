@@ -24,9 +24,6 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - id: pages
-        uses: actions/configure-pages@v6
-
       # Daily run (or manual): search fares, send Telegram, write site/data.json
       - if: github.event_name != 'push'
         uses: astral-sh/setup-uv@v10.3.0
@@ -50,6 +47,10 @@ jobs:
           git push
 
       # Frontend-only change: republish the page with the data already online
+      - id: pages
+        if: github.event_name == 'push'
+        uses: actions/configure-pages@v6
+
       - name: Recupera i dati pubblicati
         if: github.event_name == 'push'
         run: |
