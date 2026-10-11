@@ -1,0 +1,27 @@
+# Partenza
+origin_city = "ROM"                 # codice città Travelpayouts (FCO + CIA)
+origin_label = "Roma"
+ryanair_airports = ["FCO", "CIA"]
+
+# Periodi: tutti i weekend e i ponti entro questo orizzonte
+horizon_days = 365
+holiday_subdiv = "RM"               # aggiunge Santi Pietro e Paolo (29 giugno)
+max_bridge_days = 1                 # giorni di ferie per fare il ponte (festa di giovedì → prendi venerdì)
+depart_day_before = true            # parti anche la sera prima (es. venerdì)
+
+delay_seconds = 0.3                 # pausa tra le richieste
+state_file = "data/state.json"
+site_data_file = "site/data.json"   # dati per la pagina web
+
+[times]                             # per escludere viaggi inutili o che richiedono ferie
+day_before_from = "17:00"           # la sera prima: partenza dopo le 17
+first_day_until = "14:00"           # il primo giorno libero: partenza entro le 14
+return_from = "12:00"               # l'ultimo giorno: rientro dopo le 12
+
+[deals]
+discount = 0.5                      # avvisa se costa almeno la metà del prezzo tipico
+min_saving_eur = 15                 # ...e risparmi almeno 15 €
+min_samples = 5                     # periodi minimi con un prezzo per stimare il prezzo tipico
+lookback_days = 90                  # storico usato per il prezzo tipico
+realert_drop = 0.10                 # riavvisa sullo stesso volo solo se scende di un altro 10%
+max_per_message = 40

@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Voli da Roma · weekend e ponti</title>
+  <meta name="description" content="Voli andata e ritorno da Roma per tutti i weekend e i ponti dei prossimi 12 mesi, con i prezzi anomali in evidenza.">
+  <meta name="theme-color" content="#5A1A2B">
+  <meta name="robots" content="noindex">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="preload" href="fonts/bodoni-moda-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="fonts/red-hat-mono-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="style.css">
+  <script type="module" src="app.js"></script>
+</head>
+<body>
+  <svg class="defs" aria-hidden="true" focusable="false">
+    <filter id="ink" x="-10%" y="-10%" width="120%" height="120%">
+      <feTurbulence type="fractalNoise" baseFrequency=".9" numOctaves="2" seed="7" result="n"/>
+      <feDisplacementMap in="SourceGraphic" in2="n" scale="2.2"/>
+    </filter>
+    <symbol id="i-arrow" viewBox="0 0 16 16"><path d="M5 11 11 5M6 5h5v5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-search" viewBox="0 0 16 16"><g fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="7" cy="7" r="4.5"/><path d="m10.5 10.5 3 3"/></g></symbol>
+    <symbol id="i-chip" viewBox="0 0 32 20"><g fill="none" stroke="currentColor" stroke-width="1.6"><rect x="1" y="1" width="30" height="18" rx="2"/><circle cx="16" cy="10" r="5"/><path d="M1 10h10M21 10h10"/></g></symbol>
+  </svg>
+
+  <header class="cover">
+    <svg class="guilloche" id="guilloche" viewBox="0 0 600 600" aria-hidden="true"></svg>
+    <div class="cover-inner">
+      <svg class="chip" aria-hidden="true"><use href="#i-chip"/></svg>
+      <h1 class="cover-title">Voli da Roma<span> nei giorni liberi</span></h1>
+      <p class="cover-meta" id="meta">Carico le tariffe…</p>
+    </div>
+  </header>
+
+  <form class="controls" id="controls" aria-label="Filtri" onsubmit="return false">
+    <div class="tabs" role="tablist" aria-label="Vista">
+      <button type="button" role="tab" id="tab-periodi" aria-controls="main" aria-selected="true" data-view="periodi">Periodi</button>
+      <button type="button" role="tab" id="tab-mete" aria-controls="main" aria-selected="false" data-view="mete">Mete</button>
+    </div>
+    <label class="search">
+      <svg aria-hidden="true"><use href="#i-search"/></svg>
+      <span class="sr">Cerca una meta</span>
+      <input type="search" id="q" placeholder="Cerca una meta o un paese" autocomplete="off" spellcheck="false">
+    </label>
+    <div class="toggles">
+      <label class="toggle"><input type="checkbox" id="onlyDeals"><span>Solo prezzi anomali</span></label>
+      <label class="toggle"><input type="checkbox" id="onlyLong"><span>Solo ponti e feste</span></label>
+      <label class="toggle"><input type="checkbox" id="onlyDirect"><span>Solo diretti</span></label>
+    </div>
+    <label class="budget">
+      <span>Fino a <output id="budgetOut" for="budget">qualsiasi prezzo</output></span>
+      <input type="range" id="budget" min="20" max="1000" step="10" value="1000">
+    </label>
+  </form>
+
+  <main id="main" tabindex="-1" aria-live="polite" aria-busy="true"></main>
+
+  <footer class="colophon" id="colophon"></footer>
+
+  <div class="tip" id="tip" role="tooltip" hidden></div>
+</body>
+</html>

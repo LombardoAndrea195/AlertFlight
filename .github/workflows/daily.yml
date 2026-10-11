@@ -1,0 +1,71 @@
+name: Voli economici
+
+on:
+  schedule:
+    - cron: "0 6 * * *" # 8:00 ora italiana (7:00 d'inverno)
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ["site/**", ".github/workflows/daily.yml"]
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: voli-alert
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - id: pages
+        uses: actions/configure-pages@v6
+
+      # Daily run (or manual): search fares, send Telegram, write site/data.json
+      - if: github.event_name != 'push'
+        uses: astral-sh/setup-uv@v10.3.0
+
+      - if: github.event_name != 'push'
+        run: uv run python -m voli_alert
+        env:
+          TRAVELPAYOUTS_TOKEN: ${{ secrets.TRAVELPAYOUTS_TOKEN }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+
+      - name: Salva lo storico prezzi
+        if: github.event_name != 'push'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/state.json
+          git diff --cached --quiet && exit 0
+          git commit -m "Storico prezzi $(date -u +%F)"
+          git pull --rebase
+          git push
+
+      # Frontend-only change: republish the page with the data already online
+      - name: Recupera i dati pubblicati
+        if: github.event_name == 'push'
+        run: |
+          curl -fsSL "${{ steps.pages.outputs.base_url }}/data.json" -o site/data.json \
+            || echo "Nessun dato pubblicato, lancia il workflow a mano"
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5

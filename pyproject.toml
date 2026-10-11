@@ -1,0 +1,18 @@
+[project]
+name = "voli-alert"
+version = "0.1.0"
+description = "Alert giornaliero di voli economici per weekend e ponti"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "holidays>=0.106",
+    "requests>=2.34.2",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]

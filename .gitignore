@@ -1,0 +1,6 @@
+.venv/
+__pycache__/
+.pytest_cache/
+site/data.json
+.impeccable/
+.playwright-cli/
