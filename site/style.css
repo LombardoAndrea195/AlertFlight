@@ -48,6 +48,9 @@
   --gutter: clamp(1rem, 0.5rem + 2.5vw, 2.5rem);
   --measure: 76rem;
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  /* Horizontal padding that also clears the notch in landscape */
+  --pad-l: max(var(--gutter), env(safe-area-inset-left, 0px));
+  --pad-r: max(var(--gutter), env(safe-area-inset-right, 0px));
 
   color-scheme: light;
   accent-color: var(--violet);
@@ -55,7 +58,14 @@
 
 *, *::before, *::after { box-sizing: border-box; }
 
-html { -webkit-text-size-adjust: 100%; scrollbar-color: #b3bca8 var(--paper); }
+html {
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+  scrollbar-color: #b3bca8 var(--paper);
+}
+
+button, a, label, input[type="range"] { touch-action: manipulation; }
+button, .book, .tabs, .segmented, .toggle, .more { -webkit-user-select: none; user-select: none; }
 
 body {
   margin: 0;
@@ -97,7 +107,7 @@ a { color: inherit; text-underline-offset: 0.2em; text-decoration-thickness: 1px
   position: relative;
   max-width: var(--measure);
   margin: 0 auto;
-  padding: clamp(1.75rem, 4vw, 3rem) var(--gutter) clamp(1.5rem, 3vw, 2.25rem);
+  padding: clamp(1.75rem, 4vw, 3rem) var(--pad-r) clamp(1.5rem, 3vw, 2.25rem) var(--pad-l);
 }
 .chip { display: block; width: 2.5rem; height: 1.5625rem; margin-bottom: 1rem; color: var(--foil); }
 .cover-title {
@@ -131,7 +141,9 @@ a { color: inherit; text-underline-offset: 0.2em; text-decoration-thickness: 1px
   gap: 0.75rem 1.5rem;
   max-width: 100%;
   margin: 0;
-  padding: 0.75rem max(var(--gutter), calc((100% - var(--measure)) / 2 + var(--gutter)));
+  padding-block: 0.75rem;
+  padding-left: max(var(--pad-l), calc((100% - var(--measure)) / 2 + var(--gutter)));
+  padding-right: max(var(--pad-r), calc((100% - var(--measure)) / 2 + var(--gutter)));
   background: var(--paper);
   border-bottom: 1px solid var(--rule);
 }
@@ -152,8 +164,24 @@ a { color: inherit; text-underline-offset: 0.2em; text-decoration-thickness: 1px
 }
 .tabs button + button { border-left: 1px solid var(--ink); }
 .tabs button[aria-selected="true"] { background: var(--ink); color: var(--paper); }
-.tabs button:not([aria-selected="true"]):hover { background: var(--paper-2); }
 .tabs button:focus-visible { outline-offset: -4px; outline-color: var(--foil); }
+
+.segmented { display: flex; border: 1px solid var(--ink); border-radius: 3px; overflow: hidden; }
+.segmented label { position: relative; cursor: pointer; }
+.segmented label + label { border-left: 1px solid var(--ink); }
+.segmented input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.segmented span {
+  display: block;
+  padding: 0.45rem 0.8rem;
+  color: var(--ink);
+  font: 600 var(--fs-xs)/1 var(--mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  transition: background-color 160ms var(--ease-out), color 160ms var(--ease-out);
+}
+.segmented input:checked + span { background: var(--ink); color: var(--paper); }
+.segmented input:focus-visible + span { outline: 2px solid var(--foil); outline-offset: -4px; }
 
 .search {
   position: relative;
@@ -174,7 +202,6 @@ a { color: inherit; text-underline-offset: 0.2em; text-decoration-thickness: 1px
   caret-color: var(--violet);
 }
 .search input::placeholder { color: var(--ink-2); opacity: 1; }
-.search input:hover { border-color: #a9b29e; }
 .search input:focus-visible { outline-offset: 0; border-color: var(--violet); }
 
 .toggles { display: flex; flex-wrap: wrap; gap: 0.5rem; }
@@ -189,7 +216,6 @@ a { color: inherit; text-underline-offset: 0.2em; text-decoration-thickness: 1px
   color: var(--ink-2);
   transition: background-color 160ms var(--ease-out), color 160ms var(--ease-out), border-color 160ms var(--ease-out);
 }
-.toggle:hover span { border-color: var(--ink-2); color: var(--ink); }
 .toggle input:checked + span { background: var(--violet); border-color: var(--violet); color: #fff; }
 .toggle input:focus-visible + span { outline: 2px solid var(--violet); outline-offset: 2px; }
 
@@ -199,7 +225,7 @@ a { color: inherit; text-underline-offset: 0.2em; text-decoration-thickness: 1px
 
 /* Pages (periods) */
 
-main { max-width: var(--measure); margin: 0 auto; padding: 0 var(--gutter) 4rem; outline: none; }
+main { max-width: var(--measure); margin: 0 auto; padding: 0 var(--pad-r) 4rem var(--pad-l); outline: none; }
 
 .page { padding: clamp(1.75rem, 4vw, 2.75rem) 0 1.25rem; border-bottom: 1px solid var(--rule); }
 .page-head {
@@ -239,7 +265,6 @@ main { max-width: var(--measure); margin: 0 auto; padding: 0 var(--gutter) 4rem;
   border-bottom: 1px solid var(--rule);
   transition: background-color 120ms var(--ease-out);
 }
-.fare:hover { background: var(--paper-2); }
 
 .place { min-width: 0; }
 .place-name { display: block; font-weight: 600; line-height: 1.25; }
@@ -297,7 +322,6 @@ main { max-width: var(--measure); margin: 0 auto; padding: 0 var(--gutter) 4rem;
   transition: background-color 140ms var(--ease-out), color 140ms var(--ease-out);
 }
 .book svg { width: 0.875rem; height: 0.875rem; }
-.book:hover { background: var(--ink); color: var(--paper); }
 
 .more {
   appearance: none;
@@ -311,7 +335,6 @@ main { max-width: var(--measure); margin: 0 auto; padding: 0 var(--gutter) 4rem;
   text-underline-offset: 0.25em;
   cursor: pointer;
 }
-.more:hover { color: var(--violet); }
 
 /* The stamp lands once, on first paint */
 .first-paint .stamp { animation: stamp 520ms var(--ease-out) both; animation-delay: calc(var(--i, 0) * 70ms + 150ms); }
@@ -341,7 +364,6 @@ main { max-width: var(--measure); margin: 0 auto; padding: 0 var(--gutter) 4rem;
   color: var(--ink-2);
 }
 .dest { padding: 0.6rem 0.5rem; border-bottom: 1px solid var(--rule); }
-.dest:hover { background: var(--paper-2); }
 .dest .price { text-align: left; }
 
 .strip, .months {
@@ -358,7 +380,7 @@ main { max-width: var(--measure); margin: 0 auto; padding: 0 var(--gutter) 4rem;
 .cell.is-new { background: var(--green); }
 .cell.is-kind { box-shadow: inset 0 -3px 0 var(--cover); }
 .cell.is-empty { height: 1px; min-height: 1px; background: var(--rule); }
-a.cell:hover, a.cell:focus-visible { background: var(--ink); outline-offset: 1px; }
+a.cell:focus-visible { background: var(--ink); outline-offset: 1px; }
 
 .tip {
   position: fixed;
@@ -380,26 +402,59 @@ a.cell:hover, a.cell:focus-visible { background: var(--ink); outline-offset: 1px
 .state h2 { margin: 0 0 0.5rem; font: 500 var(--fs-md)/1.2 var(--serif); }
 .state p { margin: 0 0 1rem; color: var(--ink-2); }
 .state button { font: 600 var(--fs-xs)/1 var(--sans); padding: 0.55rem 0.9rem; border: 1px solid var(--ink); border-radius: 3px; background: none; color: var(--ink); cursor: pointer; }
-.state button:hover { background: var(--ink); color: var(--paper); }
 .state.is-error h2 { color: var(--red); }
 
 .colophon {
   max-width: var(--measure);
   margin: 0 auto;
-  padding: 2rem var(--gutter) 3rem;
+  padding: 2rem var(--pad-r) calc(3rem + env(safe-area-inset-bottom, 0px)) var(--pad-l);
   font-size: var(--fs-xs);
   color: var(--ink-2);
 }
 .colophon p { max-width: 68ch; margin: 0 0 0.5rem; }
+
+/* Hover only with a real mouse: on touch it would stay stuck after a tap */
+
+@media (hover: hover) and (pointer: fine) {
+  .tabs button:not([aria-selected="true"]):hover { background: var(--paper-2); }
+  .segmented label:hover input:not(:checked) + span { background: var(--paper-2); }
+  .search input:hover { border-color: #a9b29e; }
+  .toggle:hover span { border-color: var(--ink-2); color: var(--ink); }
+  .fare:hover, .dest:hover { background: var(--paper-2); }
+  .book:hover, .state button:hover { background: var(--ink); color: var(--paper); }
+  .more:hover { color: var(--violet); }
+  a.cell:hover { background: var(--ink); }
+}
+
+/* Press feedback, the moment the finger lands */
+
+.tabs button:active:not([aria-selected="true"]),
+.segmented label:active input:not(:checked) + span { background: var(--paper-2); }
+.toggle:active span, .book:active, .state button:active { scale: 0.97; }
+.book, .toggle span, .state button { transition-property: background-color, color, border-color, scale; }
+
+/* Touch: fingers need bigger targets than a cursor */
+
+@media (pointer: coarse) {
+  .tabs button { min-height: 2.75rem; }
+  .segmented span { display: flex; align-items: center; justify-content: center; min-height: 2.75rem; }
+  .toggle span { padding-block: 0.65rem; }
+  .book { min-height: 2.75rem; padding-inline: 0.9rem; }
+  .more { min-height: 2.75rem; }
+  .budget input { height: 2rem; }
+}
 
 /* Narrow screens */
 
 @media (max-width: 52rem) {
   .controls { position: static; gap: 0.6rem 0.75rem; padding-block: 0.75rem; }
   .dest-head { top: 0; }
-  .search { order: 3; flex-basis: 100%; max-width: none; }
-  .toggles { order: 4; }
-  .budget { order: 2; flex: 1 1 9rem; }
+  .budget { order: 2; flex: 1 1 8rem; min-width: 0; }
+  .segmented { order: 3; flex-basis: 100%; }
+  .segmented label { flex: 1; display: flex; }
+  .segmented span { flex: 1; padding-inline: 0.35rem; text-align: center; white-space: normal; line-height: 1.15; letter-spacing: 0.04em; }
+  .search { order: 4; flex-basis: 100%; max-width: none; }
+  .toggles { order: 5; }
 
   .fare {
     grid-template-columns: 1fr auto;

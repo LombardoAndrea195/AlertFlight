@@ -1,5 +1,6 @@
 from datetime import date
 
+from voli_alert.__main__ import times_ok
 from voli_alert.deals import best_per_window_city, new_alerts, reference_prices
 from voli_alert.periods import Window, windows
 from voli_alert.sources import Offer
@@ -57,3 +58,16 @@ def test_needs_enough_samples():
     ws = windows(date(2026, 10, 11), 30, 1, "RM")
     offers = [offer(ws[0], "JFK", 100), offer(ws[1], "JFK", 10)]
     assert find_deals(best_per_window_city(offers), {}, date(2026, 10, 11), CFG) == []
+
+
+def test_one_way_times():
+    t = {"day_before_from": "17:00", "first_day_until": "14:00", "return_from": "12:00"}
+    w = windows(date(2026, 10, 11), 7, 1, "RM")[0]  # sat 17 - sun 18 Oct
+
+    def leg(when: str, trip: str) -> Offer:
+        return Offer(w, "BCN", 20, when, "", "FCO", "BCN", 0, "FR", "", trip)
+
+    assert times_ok(leg("2026-10-16T18:30", "andata"), t)
+    assert not times_ok(leg("2026-10-16T09:00", "andata"), t)  # friday morning needs a day off
+    assert times_ok(leg("2026-10-18T19:00", "ritorno"), t)
+    assert not times_ok(leg("2026-10-18T08:00", "ritorno"), t)  # sunday morning wastes the day

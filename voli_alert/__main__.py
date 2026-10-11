@@ -5,6 +5,7 @@ import logging
 import os
 import time
 import tomllib
+from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime
 from pathlib import Path
 
@@ -23,35 +24,67 @@ def out_times(d: date, w, t: dict) -> tuple[str, str]:
 
 
 def times_ok(o: sources.Offer, t: dict) -> bool:
+    if o.trip == "ritorno":
+        return o.depart[11:16] >= t["return_from"]
     lo, hi = out_times(date.fromisoformat(o.depart[:10]), o.window, t)
-    return lo <= o.depart[11:16] <= hi and o.ret[11:16] >= t["return_from"]
+    return lo <= o.depart[11:16] <= hi and (o.trip == "andata" or o.ret[11:16] >= t["return_from"])
+
+
+def run(job) -> tuple[list[sources.Offer], bool]:
+    try:
+        return job(), False
+    except Exception as e:  # one failing call must not kill the daily run
+        log.warning("%s", e)
+        return [], True
+
+
+def wizz_jobs(cfg: dict, today: date, wins: list, geo: sources.Geo) -> list:
+    wz = cfg["wizzair"]
+    try:
+        wizz = sources.WizzAir(wz["airports"], wz["delay_seconds"], wz["cooldown_seconds"])
+    except Exception as e:
+        log.warning("Wizz Air unavailable: %s", e)
+        return []
+    log.info("Wizz Air: %d routes", len(wizz.routes))
+    t = cfg["times"]
+    trips = [
+        (w, d, out_times(d, w, t))
+        for w in wins if (w.start - today).days <= wz["horizon_days"]
+        for d in w.outbound_dates(cfg["depart_day_before"]) if d > today
+    ]
+    return [lambda o=o, d=d: wizz.offers(o, d, trips, t["return_from"], geo) for o, d in wizz.routes]
 
 
 def collect(cfg: dict, today: date, geo: sources.Geo) -> tuple[list, list[sources.Offer]]:
     tp_token = os.environ.get("TRAVELPAYOUTS_TOKEN")
     if not tp_token:
-        log.warning("TRAVELPAYOUTS_TOKEN not set: only Ryanair will be searched")
+        log.warning("TRAVELPAYOUTS_TOKEN not set: no other airlines and no intercontinental flights")
 
     t = cfg["times"]
+    home = cfg["origin_city"]
     wins = windows(today, cfg["horizon_days"], cfg["max_bridge_days"], cfg.get("holiday_subdiv"))
     log.info("%d windows to check", len(wins))
     offers, errors, calls = [], 0, 0
-    for w in wins:
-        out = [d for d in w.outbound_dates(cfg["depart_day_before"]) if d > today]
-        jobs = [
-            lambda a=a, d=d: sources.ryanair(a, w, d, out_times(d, w, t), [w.end], t["return_from"], geo)
-            for a in cfg["ryanair_airports"] for d in out
-        ]
-        if tp_token:
-            jobs += [lambda d=d: sources.travelpayouts(tp_token, cfg["origin_city"], w, d, w.end) for d in out]
-        for job in jobs:
-            calls += 1
-            try:
-                offers += job()
-            except Exception as e:  # one failing call must not kill the daily run
-                errors += 1
-                log.warning("%s: %s", w.id, e)
-            time.sleep(cfg["delay_seconds"])
+    # Wizz Air gets its own thread: it must go slowly, so it runs alongside the other sources
+    with ThreadPoolExecutor(1) as pool:
+        wizz = [pool.submit(run, job) for job in wizz_jobs(cfg, today, wins, geo)]
+        for w in wins:
+            out = [d for d in w.outbound_dates(cfg["depart_day_before"]) if d > today]
+            jobs = [
+                lambda a=a, d=d: sources.ryanair(a, w, d, out_times(d, w, t), [w.end], t["return_from"], geo)
+                for a in cfg["ryanair_airports"] for d in out
+            ]
+            if tp_token:
+                jobs += [lambda d=d, k=k: sources.travelpayouts(tp_token, home, w, d, k)
+                         for d in out for k in ("ar", "andata")]
+                jobs.append(lambda: sources.travelpayouts(tp_token, home, w, w.end, "ritorno"))
+            for job in jobs:
+                found, failed = run(job)
+                calls, errors, offers = calls + 1, errors + failed, offers + found
+                time.sleep(cfg["delay_seconds"])
+        for f in wizz:
+            found, failed = f.result()
+            calls, errors, offers = calls + 1, errors + failed, offers + found
     log.info("%d calls, %d errors, %d offers", calls, errors, len(offers))
     if calls and errors == calls:
         raise SystemExit("Every request failed")
@@ -108,11 +141,32 @@ def _post(token: str, chat: str, text: str) -> None:
     r.raise_for_status()
 
 
-def site_data(cfg, wins, best, refs, deals, geo: sources.Geo) -> dict:
-    """Everything the web page shows, as compact JSON."""
+def site_data(cfg, wins, trips: dict, deals, geo: sources.Geo) -> dict:
+    """Everything the web page shows, as compact JSON. `trips` maps trip type to (best offers, typical prices)."""
     index = {w.id: i for i, w in enumerate(wins)}
     alerted = {(d.offer.window.id, d.offer.city) for d in deals}
-    cities = {o.city for o in best.values()}
+    cities = {o.city for best, _ in trips.values() for o in best.values()}
+
+    def fares(trip: str) -> list[dict]:
+        best, refs = trips[trip]
+        return [
+            {
+                "w": index[o.window.id],
+                "c": o.city,
+                "p": round(o.price, 2),
+                "r": refs.get(o.city),
+                "d": o.depart[:16],
+                **({"b": o.ret[:16]} if o.ret else {}),
+                "o": o.origin_airport,
+                "a": o.dest_airport,
+                "s": o.stops,
+                "k": o.carrier,
+                "l": o.link,
+                **({"n": 1} if trip == "ar" and (o.window.id, o.city) in alerted else {}),
+            }
+            for o in sorted(best.values(), key=lambda o: (index[o.window.id], o.price))
+        ]
+
     return {
         "generated": datetime.now().astimezone().isoformat(timespec="minutes"),
         "origin": cfg["origin_label"],
@@ -129,23 +183,9 @@ def site_data(cfg, wins, best, refs, deals, geo: sources.Geo) -> dict:
         "places": {
             c: [geo.city_name.get(c, c), geo.country_name.get(geo.city_country.get(c, ""), "")] for c in sorted(cities)
         },
-        "fares": [
-            {
-                "w": index[o.window.id],
-                "c": o.city,
-                "p": round(o.price, 2),
-                "r": refs.get(o.city),
-                "d": o.depart[:16],
-                "b": o.ret[:16],
-                "o": o.origin_airport,
-                "a": o.dest_airport,
-                "s": o.stops,
-                "k": o.carrier,
-                "l": o.link,
-                **({"n": 1} if (o.window.id, o.city) in alerted else {}),
-            }
-            for o in sorted(best.values(), key=lambda o: (index[o.window.id], o.price))
-        ],
+        "fares": fares("ar"),
+        "andata": fares("andata"),
+        "ritorno": fares("ritorno"),
     }
 
 
@@ -163,14 +203,19 @@ def main() -> None:
 
     geo = sources.Geo()
     wins, offers = collect(cfg, today, geo)
-    best = best_per_window_city(offers)
-    refs = reference_prices(best, state, today, cfg["deals"])
+    trips = {}
+    for trip in ("ar", "andata", "ritorno"):
+        best = best_per_window_city([o for o in offers if o.trip == trip])
+        # One-way legs keep their own price history, apart from round trips
+        trips[trip] = best, reference_prices(best, state if trip == "ar" else state.setdefault(trip, {}),
+                                             today, cfg["deals"])
+    best, refs = trips["ar"]
     deals = new_alerts(best, refs, state, today, cfg["deals"])
     log.info("%d new deals", len(deals))
 
     site_path = ROOT / cfg["site_data_file"]
     site_path.parent.mkdir(parents=True, exist_ok=True)
-    site_path.write_text(json.dumps(site_data(cfg, wins, best, refs, deals, geo), ensure_ascii=False, separators=(",", ":")))
+    site_path.write_text(json.dumps(site_data(cfg, wins, trips, deals, geo), ensure_ascii=False, separators=(",", ":")))
 
     message = format_message(deals, geo, cfg["origin_label"]) if deals else None
     if args.dry_run:

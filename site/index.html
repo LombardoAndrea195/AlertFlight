@@ -2,9 +2,9 @@
 <html lang="it">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Voli da Roma · weekend e ponti</title>
-  <meta name="description" content="Voli andata e ritorno da Roma per tutti i weekend e i ponti dei prossimi 12 mesi, con i prezzi anomali in evidenza.">
+  <meta name="description" content="Voli da Roma, andata e ritorno o solo andata, per tutti i weekend e i ponti dei prossimi 12 mesi, con i prezzi anomali in evidenza.">
   <meta name="theme-color" content="#5A1A2B">
   <meta name="robots" content="noindex">
   <link rel="icon" href="favicon.svg" type="image/svg+xml">
@@ -38,10 +38,15 @@
       <button type="button" role="tab" id="tab-periodi" aria-controls="main" aria-selected="true" data-view="periodi">Periodi</button>
       <button type="button" role="tab" id="tab-mete" aria-controls="main" aria-selected="false" data-view="mete">Mete</button>
     </div>
+    <div class="segmented" role="radiogroup" aria-label="Tipo di viaggio">
+      <label><input type="radio" name="trip" value="ar" checked><span>Andata e ritorno</span></label>
+      <label><input type="radio" name="trip" value="andata"><span>Solo andata</span></label>
+      <label><input type="radio" name="trip" value="ritorno"><span>Solo ritorno</span></label>
+    </div>
     <label class="search">
       <svg aria-hidden="true"><use href="#i-search"/></svg>
       <span class="sr">Cerca una meta</span>
-      <input type="search" id="q" placeholder="Cerca una meta o un paese" autocomplete="off" spellcheck="false">
+      <input type="search" id="q" placeholder="Cerca una meta o un paese" autocomplete="off" spellcheck="false" enterkeyhint="search">
     </label>
     <div class="toggles">
       <label class="toggle"><input type="checkbox" id="onlyDeals"><span>Solo prezzi anomali</span></label>

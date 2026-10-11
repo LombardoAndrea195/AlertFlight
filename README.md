@@ -1,12 +1,13 @@
 # Voli economici da Roma per weekend e ponti
 
-Ogni mattina controlla **tutti i weekend e i ponti dei prossimi 12 mesi**, cerca i voli andata e ritorno da Roma (FCO + CIA) verso qualsiasi destinazione e:
+Ogni mattina controlla **tutti i weekend e i ponti dei prossimi 12 mesi**, cerca i voli da Roma (FCO + CIA) verso qualsiasi destinazione, **andata e ritorno, solo andata e solo ritorno**, e:
 
-- ti manda su **Telegram** i nuovi voli con un **prezzo anomalo** (almeno il 50% sotto il prezzo tipico di quella meta);
-- pubblica una **pagina web** su GitHub Pages con tutte le tariffe del giorno.
+- ti manda su **Telegram** i nuovi voli andata e ritorno con un **prezzo anomalo** (almeno il 50% sotto il prezzo tipico di quella meta);
+- pubblica una **pagina web** su GitHub Pages con tutte le tariffe del giorno, comoda anche da telefono.
 
 ## La pagina
 
+- **Tipo di viaggio**: andata e ritorno, solo andata (Roma → meta) o solo ritorno (meta → Roma).
 - **Periodi**: ogni weekend o ponte, con la data e le mete più economiche. I prezzi anomali hanno un timbro (verde se trovati oggi, viola se già segnalati).
 - **Mete**: per ogni destinazione, una barra per ogni periodo dell'anno (più alta = più cara). Così vedi subito quando conviene andarci. Tocca una barra per prenotare.
 - **Filtri**: solo prezzi anomali, solo ponti e feste, solo voli diretti, budget massimo, ricerca per meta o paese. Vengono ricordati dal browser.
@@ -16,14 +17,15 @@ Ogni mattina controlla **tutti i weekend e i ponti dei prossimi 12 mesi**, cerca
 ## Come funziona la ricerca
 
 1. **Periodi**: weekend e ponti calcolati dalle festività italiane (+ Santi Pietro e Paolo per Roma). Se una festa cade di martedì o giovedì, aggiunge un giorno di ferie per fare il ponte.
-2. **Ricerca "ovunque"**: per ogni periodo una sola richiesta restituisce il prezzo più basso verso *tutte* le destinazioni:
-   - **Ryanair** (gratis, prezzi in tempo reale, voli diretti in Europa e Mediterraneo)
-   - **Travelpayouts / Aviasales** (gratis con token, tutte le compagnie e tutto il mondo, dati in cache delle ultime 48 ore)
-3. **Orari sensati**: la sera prima si parte dopo le 17, il primo giorno libero entro le 14, e l'ultimo giorno si rientra dopo le 12.
-4. **Prezzo anomalo**: il prezzo tipico di ogni meta è la mediana dei prezzi su tutti i periodi negli ultimi 90 giorni. È anomalo se costa almeno il 50% in meno e fa risparmiare almeno 15 €.
+2. **Fonti**:
+   - **Ryanair** (gratis, prezzi in tempo reale, voli diretti in Europa e Mediterraneo): una richiesta per periodo restituisce tutte le destinazioni.
+   - **Wizz Air** (gratis, prezzi in tempo reale, voli diretti): una richiesta per tratta ogni 42 giorni. Wizz Air blocca chi va troppo veloce, quindi si fa una richiesta ogni 2 secondi circa: la ricerca completa dura una mezz'ora, in parallelo alle altre.
+   - **Travelpayouts / Aviasales** (gratis con token): **tutte le compagnie e tutto il mondo, compresi i voli intercontinentali** e con scalo. Dati in cache delle ultime 48 ore.
+3. **Orari sensati**: la sera prima si parte dopo le 17, il primo giorno libero entro le 14, e l'ultimo giorno si rientra dopo le 12. Valgono anche per i voli di sola andata e di solo ritorno.
+4. **Prezzo anomalo**: il prezzo tipico di ogni meta è la mediana dei prezzi su tutti i periodi negli ultimi 90 giorni, calcolata a parte per andata e ritorno, solo andata e solo ritorno. È anomalo se costa almeno il 50% in meno e fa risparmiare almeno 15 €.
 5. **Niente doppioni** su Telegram: lo stesso volo viene segnalato di nuovo solo se scende di un altro 10%.
 
-Lo storico è in `data/state.json` (pochi KB) e viene salvato con un commit giornaliero. Soglie e orari sono in `config.toml`.
+La pagina mostra solo i dati dell'ultima ricerca e i periodi futuri. Lo storico in `data/state.json` (pochi KB) tiene solo il prezzo mediano per meta degli ultimi 90 giorni, che serve a riconoscere i prezzi anomali; viene salvato con un commit giornaliero. Soglie, orari e fonti sono in `config.toml`.
 
 ## Pubblicazione su GitHub (una sola volta)
 
@@ -39,7 +41,7 @@ Lo storico è in `data/state.json` (pochi KB) e viene salvato con un commit gior
 3. **Secret**: *Settings → Secrets and variables → Actions → New repository secret*:
    - `TELEGRAM_BOT_TOKEN`: scrivi a [@BotFather](https://t.me/BotFather), `/newbot`, copia il token.
    - `TELEGRAM_CHAT_ID`: manda un messaggio al tuo bot e apri `https://api.telegram.org/bot<TOKEN>/getUpdates` per leggere `chat.id`.
-   - `TRAVELPAYOUTS_TOKEN` (facoltativo, aggiunge le mete intercontinentali): registrati su [travelpayouts.com](https://www.travelpayouts.com) e copialo da *Profilo → API token*.
+   - `TRAVELPAYOUTS_TOKEN` (facoltativo ma consigliato: aggiunge tutte le altre compagnie e **i voli intercontinentali**): registrati su [travelpayouts.com](https://www.travelpayouts.com) e copialo da *Profilo → API token*.
 4. **Primo avvio**: *Actions → Voli economici → Run workflow*. Dopo un paio di minuti la pagina è online su `https://<utente>.github.io/<repo>/`.
 
 Senza i secret Telegram il workflow funziona lo stesso: aggiorna solo la pagina.
@@ -48,7 +50,7 @@ Senza i secret Telegram il workflow funziona lo stesso: aggiorna solo la pagina.
 
 | Quando | Cosa fa |
 |---|---|
-| Ogni giorno alle 8:00 (7:00 d'inverno) o con *Run workflow* | Cerca i voli, invia Telegram, salva lo storico, pubblica la pagina con i nuovi dati |
+| Ogni giorno alle 8:00 (7:00 d'inverno) o con *Run workflow* | Cerca i voli (circa mezz'ora, per via di Wizz Air), invia Telegram, salva lo storico, pubblica la pagina con i nuovi dati |
 | Push su `main` che cambia `site/` o il workflow | Ripubblica solo la pagina, riusando i dati già online (nessuna ricerca, nessun messaggio) |
 
 ## Uso in locale

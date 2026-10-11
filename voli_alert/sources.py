@@ -1,7 +1,8 @@
 import logging
+import re
 import time
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
 
 import requests
 
@@ -25,6 +26,7 @@ class Offer:
     stops: int
     carrier: str
     link: str
+    trip: str = "ar"  # "ar" round trip; "andata" / "ritorno" one-way leg, with ret = ""
 
 
 class Geo:
@@ -55,10 +57,11 @@ class Geo:
         return f"{name} ({country})" if country else name
 
 
-def _get(url: str, params: dict | None = None, headers: dict | None = None, tries: int = 3):
+def _get(url: str, params: dict | None = None, headers: dict | None = None, tries: int = 3, body: dict | None = None):
     for attempt in range(tries):
         try:
-            r = requests.get(url, params=params, headers=HEADERS | (headers or {}), timeout=30)
+            r = requests.request("POST" if body else "GET", url, params=params, json=body,
+                                 headers=HEADERS | (headers or {}), timeout=30)
             if r.status_code == 429 or r.status_code >= 500:
                 raise requests.HTTPError(f"HTTP {r.status_code}", response=r)
             r.raise_for_status()
@@ -95,40 +98,134 @@ def ryanair(
         city = geo.city_of(dest)
         if not geo.city_name.get(city, "").strip() or geo.city_name[city].startswith("Aeroporto"):
             geo.city_name[city] = o["arrivalAirport"]["city"]["name"]
-        link = (
-            "https://www.ryanair.com/it/it/trip/flights/select?adults=1&isReturn=true"
-            f"&dateOut={o['departureDate'][:10]}&dateIn={i['departureDate'][:10]}"
-            f"&originIata={airport}&destinationIata={dest}"
-        )
-        offers.append(
-            Offer(w, city, f["summary"]["price"]["value"], o["departureDate"], i["departureDate"],
-                  airport, dest, 0, "Ryanair", link)
-        )
+        dep, ret = o["departureDate"], i["departureDate"]
+        offers += [
+            Offer(w, city, f["summary"]["price"]["value"], dep, ret, airport, dest, 0, "Ryanair",
+                  _ryanair_link(airport, dest, dep, ret)),
+            Offer(w, city, o["price"]["value"], dep, "", airport, dest, 0, "Ryanair",
+                  _ryanair_link(airport, dest, dep), "andata"),
+            Offer(w, city, i["price"]["value"], ret, "", dest, airport, 0, "Ryanair",
+                  _ryanair_link(dest, airport, ret), "ritorno"),
+        ]
     return offers
 
 
-def travelpayouts(token: str, origin: str, w: Window, out: date, inb: date) -> list[Offer]:
-    data = _get(
-        "https://api.travelpayouts.com/aviasales/v3/prices_for_dates",
-        {
-            "origin": origin,
-            "departure_at": out.isoformat(),
-            "return_at": inb.isoformat(),
-            "one_way": "false",
-            "unique": "true",
-            "sorting": "price",
-            "currency": "eur",
-            "market": "it",
-            "limit": 1000,
-        },
-        headers={"X-Access-Token": token},
+def _ryanair_link(origin: str, dest: str, out: str, back: str = "") -> str:
+    return (
+        f"https://www.ryanair.com/it/it/trip/flights/select?adults=1&isReturn={'true' if back else 'false'}"
+        f"&dateOut={out[:10]}{f'&dateIn={back[:10]}' if back else ''}&originIata={origin}&destinationIata={dest}"
     )
+
+
+WIZZ_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) "
+                  "Chrome/140.0.0.0 Safari/537.36",
+    "Origin": "https://www.wizzair.com",
+    "Referer": "https://www.wizzair.com/it-it/flights/timetable",
+}
+
+
+class WizzAir:
+    """Wizz Air timetable API: cheapest fare per day on each route, both directions."""
+
+    def __init__(self, airports: list[str], delay: float, cooldown: float) -> None:
+        self.delay, self.cooldown = delay, cooldown
+        page = requests.get("https://www.wizzair.com/it-it", headers=WIZZ_HEADERS, timeout=30)
+        page.raise_for_status()
+        m = re.search(r"be\.wizzair\.com/(\d+(?:\.\d+)+)", page.text)  # API version changes with each release
+        if not m:
+            raise RuntimeError("Wizz Air API version not found")
+        self.api = f"https://be.wizzair.com/{m[1]}/Api"
+        cities = _get(f"{self.api}/asset/map", {"languageCode": "it-it"}, WIZZ_HEADERS)["cities"]
+        fake = {c["iata"] for c in cities if c.get("isFakeStation")}  # "London (All Airports)" and similar
+        self.names = {c["iata"]: c["shortName"] for c in cities}
+        self.routes = [
+            (c["iata"], k["iata"]) for c in cities if c["iata"] in airports
+            for k in c["connections"] if k["iata"] not in fake
+        ]
+
+    def _timetable(self, body: dict) -> dict:
+        """Wizz Air answers 503 after ~50 quick requests: go slowly and wait it out when blocked."""
+        for attempt in range(3):
+            time.sleep(self.delay)
+            try:
+                return _get(f"{self.api}/search/timetable", headers=WIZZ_HEADERS, body=body, tries=1)
+            except requests.HTTPError as e:
+                if e.response is None or e.response.status_code not in (429, 503) or attempt == 2:
+                    raise
+                log.info("Wizz Air is throttling, waiting %ds", self.cooldown)
+                time.sleep(self.cooldown)
+
+    def offers(
+        self, origin: str, dest: str, trips: list[tuple[Window, date, tuple[str, str]]], in_from: str, geo: Geo
+    ) -> list[Offer]:
+        out: dict[str, dict] = {}
+        inb: dict[str, dict] = {}
+        start, last = min(d for _, d, _ in trips), max(w.end for w, _, _ in trips)
+        while start <= last:
+            end = min(start + timedelta(days=41), last)  # the API accepts at most 42 days
+            data = self._timetable({
+                "flightList": [
+                    {"departureStation": origin, "arrivalStation": dest, "from": str(start), "to": str(end)},
+                    {"departureStation": dest, "arrivalStation": origin, "from": str(start), "to": str(end)},
+                ],
+                "priceType": "regular",
+                "adultCount": 1,
+                "childCount": 0,
+                "infantCount": 0,
+            })
+            out |= {f["departureDate"][:10]: f for f in data.get("outboundFlights") or [] if _wizz_priced(f)}
+            inb |= {f["departureDate"][:10]: f for f in data.get("returnFlights") or [] if _wizz_priced(f)}
+            start = end + timedelta(days=1)
+
+        city = geo.city_of(dest)
+        if not geo.city_name.get(city, "").strip() or geo.city_name[city].startswith("Aeroporto"):
+            geo.city_name[city] = self.names.get(dest, dest)
+        offers = []
+        for w, d, (lo, hi) in trips:
+            o, i = out.get(str(d)), inb.get(str(w.end))
+            # The fare is the cheapest of the day: keep the day if one of its flights fits the times
+            dep = o and next((t for t in o["departureDates"] if lo <= t[11:16] <= hi), None)
+            ret = i and next((t for t in i["departureDates"] if t[11:16] >= in_from), None)
+            if dep:
+                offers.append(Offer(w, city, o["price"]["amount"], dep, "", origin, dest, 0, "Wizz Air",
+                                    _wizz_link(origin, dest, d), "andata"))
+            if ret:
+                offers.append(Offer(w, city, i["price"]["amount"], ret, "", dest, origin, 0, "Wizz Air",
+                                    _wizz_link(dest, origin, w.end), "ritorno"))
+            if dep and ret:
+                offers.append(Offer(w, city, round(o["price"]["amount"] + i["price"]["amount"], 2), dep, ret,
+                                    origin, dest, 0, "Wizz Air", _wizz_link(origin, dest, d, w.end)))
+        return offers
+
+
+def _wizz_link(origin: str, dest: str, out: date, back: date | None = None) -> str:
+    return f"https://www.wizzair.com/it-it/booking/select-flight/{origin}/{dest}/{out}/{back or 'null'}/1/0/0/null"
+
+
+def _wizz_priced(f: dict) -> bool:
+    return f.get("priceType") == "price" and f["price"]["currencyCode"] == "EUR" and f["price"]["amount"] > 0
+
+
+def travelpayouts(token: str, home: str, w: Window, out: date, trip: str = "ar") -> list[Offer]:
+    """Cached Aviasales fares, all airlines worldwide. "ritorno" searches flights to home on the last day."""
+    params = {"departure_at": out.isoformat(), "one_way": "true", "sorting": "price",
+              "currency": "eur", "market": "it", "limit": 1000}
+    if trip == "ritorno":
+        params["destination"] = home
+    else:
+        params |= {"origin": home, "unique": "true"}
+    if trip == "ar":
+        params |= {"return_at": w.end.isoformat(), "one_way": "false"}
+    data = _get("https://api.travelpayouts.com/aviasales/v3/prices_for_dates", params,
+                headers={"X-Access-Token": token})
     offers = []
     for t in data.get("data") or []:
         stops = max(t.get("transfers") or 0, t.get("return_transfers") or 0)
         offers.append(
-            Offer(w, t["destination"], float(t["price"]), t["departure_at"], t["return_at"],
-                  t.get("origin_airport", origin), t.get("destination_airport", t["destination"]), stops,
-                  t.get("airline", "?"), f"https://www.aviasales.com{t['link']}" if t.get("link") else "")
+            Offer(w, t["origin"] if trip == "ritorno" else t["destination"], float(t["price"]),
+                  t["departure_at"], (t.get("return_at") or "") if trip == "ar" else "",
+                  t.get("origin_airport", t["origin"]), t.get("destination_airport", t["destination"]), stops,
+                  t.get("airline", "?"), f"https://www.aviasales.com{t['link']}" if t.get("link") else "", trip)
         )
     return offers

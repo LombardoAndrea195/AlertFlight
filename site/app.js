@@ -22,8 +22,10 @@ function rangeTitle(w) {
 }
 
 let data;
-let state = { view: "periodi", q: "", onlyDeals: false, onlyLong: false, onlyDirect: false, budget: null };
+let state = { view: "periodi", trip: "ar", q: "", onlyDeals: false, onlyLong: false, onlyDirect: false, budget: null };
 const expanded = new Set();
+const TRIPS = { ar: "fares", andata: "andata", ritorno: "ritorno" };
+const tripFares = () => data[TRIPS[state.trip] ?? "fares"] ?? [];
 
 const isDeal = (f) => f.r != null && f.p <= f.r * (1 - data.rules.discount) && f.r - f.p >= data.rules.min_saving_eur;
 const off = (f) => Math.round((1 - f.p / f.r) * 100);
@@ -59,7 +61,7 @@ function fareRow(f, i) {
   return `<li class="${cls}">
     <div class="place"><span class="place-name">${esc(name)}</span><span class="place-country">${esc(country)}</span></div>
     <div class="trip"><span class="route">${esc(f.o)}–${esc(f.a)}</span> · ${stops} · ${esc(f.k)}<br>
-      <span class="when">${fmtWhen(f.d)} → ${fmtWhen(f.b)}</span></div>
+      <span class="when">${f.b ? `${fmtWhen(f.d)} → ${fmtWhen(f.b)}` : fmtWhen(f.d)}</span></div>
     <div class="price"><b>${eur.format(f.p)}</b>${typical}</div>
     <div class="stamp-cell">${stamp}</div>
     ${book}
@@ -146,7 +148,7 @@ function renderDestinations(fares) {
 
 function render() {
   const main = $("#main");
-  const fares = data.fares.filter(matches);
+  const fares = tripFares().filter(matches);
   if (!fares.length) {
     main.innerHTML = `<div class="state"><h2>Nessuna tariffa con questi filtri</h2>
       <p>Prova ad alzare il budget o a togliere qualche filtro.</p>
@@ -160,23 +162,25 @@ function render() {
 function renderMeta() {
   const g = new Date(data.generated);
   const age = Math.floor((Date.now() - g) / 864e5);
-  const deals = data.fares.filter((f) => f.deal).length;
-  const fresh = new Set(data.fares.filter((f) => f.n).map((f) => `${f.w}|${f.c}`)).size;
+  const list = tripFares();
+  const deals = list.filter((f) => f.deal).length;
+  const fresh = new Set(list.filter((f) => f.n).map((f) => `${f.w}|${f.c}`)).size;
   const when = `${DOW[g.getDay()]} ${g.getDate()} ${MON[g.getMonth()]}, ${g.toTimeString().slice(0, 5)}`;
   $("#meta").innerHTML = [
     age >= 2 ? `<span class="stale">Dati di ${age} giorni fa</span>` : `Aggiornato ${when}`,
     `<b>${data.windows.length}</b> periodi`,
-    `<b>${int.format(data.fares.length)}</b> tariffe`,
+    `<b>${int.format(list.length)}</b> tariffe`,
     `<b>${deals}</b> anomali${fresh ? `, <b>${fresh}</b> nuovi oggi` : ""}`,
   ].join(" · ");
 
   $("#colophon").innerHTML = `
-    <p>Prezzi andata e ritorno per 1 adulto da ${esc(data.origin)}, il più basso per ogni meta e periodo. Si parte la sera prima o il primo giorno libero e si rientra l'ultimo giorno. I prezzi possono cambiare al momento della prenotazione.</p>
-    <p>Un prezzo è <b>anomalo</b> se costa almeno il ${Math.round(data.rules.discount * 100)}% in meno del prezzo tipico di quella meta e fa risparmiare almeno ${eur.format(data.rules.min_saving_eur)}. Il prezzo tipico è la mediana delle tariffe degli ultimi 90 giorni. <b>Nuovo</b> vuol dire segnalato oggi su Telegram.</p>`;
+    <p>Prezzi per 1 adulto da ${esc(data.origin)}, il più basso per ogni meta e periodo. <b>Andata e ritorno</b>: si parte la sera prima o il primo giorno libero e si rientra l'ultimo giorno. <b>Solo andata</b> e <b>solo ritorno</b> mostrano il singolo volo, con gli stessi orari. I prezzi possono cambiare al momento della prenotazione.</p>
+    <p>Un prezzo è <b>anomalo</b> se costa almeno il ${Math.round(data.rules.discount * 100)}% in meno del prezzo tipico di quella meta e fa risparmiare almeno ${eur.format(data.rules.min_saving_eur)}. Il prezzo tipico è la mediana delle tariffe degli ultimi 90 giorni, separata per andata e ritorno, solo andata e solo ritorno. <b>Nuovo</b> vuol dire segnalato oggi su Telegram (solo per andata e ritorno).</p>`;
 }
 
 function syncControls() {
   for (const b of document.querySelectorAll("[data-view]")) b.setAttribute("aria-selected", String(b.dataset.view === state.view));
+  for (const r of document.querySelectorAll('input[name="trip"]')) r.checked = r.value === state.trip;
   $("#q").value = state.q;
   for (const id of ["onlyDeals", "onlyLong", "onlyDirect"]) $(`#${id}`).checked = state[id];
   const range = $("#budget");
@@ -188,6 +192,7 @@ function update(patch) {
   Object.assign(state, patch);
   localStorage.setItem(STORE, JSON.stringify(state));
   syncControls();
+  if ("trip" in patch) { expanded.clear(); renderMeta(); }
   render();
 }
 
@@ -197,6 +202,7 @@ function bind() {
   new ResizeObserver(setControlsHeight).observe(controls);
 
   for (const b of document.querySelectorAll("[data-view]")) b.addEventListener("click", () => update({ view: b.dataset.view }));
+  for (const r of document.querySelectorAll('input[name="trip"]')) r.addEventListener("change", () => update({ trip: r.value }));
   let t;
   $("#q").addEventListener("input", (e) => { clearTimeout(t); t = setTimeout(() => update({ q: e.target.value.trim() }), 120); });
   for (const id of ["onlyDeals", "onlyLong", "onlyDirect"]) $(`#${id}`).addEventListener("change", (e) => update({ [id]: e.target.checked }));
@@ -274,8 +280,10 @@ async function start() {
     return;
   }
 
-  for (const f of data.fares) f.deal = isDeal(f);
-  const maxPrice = Math.ceil(Math.max(...data.fares.map((f) => f.p)) / 10) * 10;
+  if (!(state.trip in TRIPS)) state.trip = "ar";
+  const all = Object.values(TRIPS).flatMap((k) => data[k] ?? []);
+  for (const f of all) f.deal = isDeal(f);
+  const maxPrice = Math.ceil(Math.max(...all.map((f) => f.p)) / 10) * 10;
   $("#budget").max = String(Math.max(maxPrice, 30));
   if (state.budget != null && state.budget >= maxPrice) state.budget = null;
 

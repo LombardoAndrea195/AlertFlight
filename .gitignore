@@ -4,3 +4,4 @@ __pycache__/
 site/data.json
 .impeccable/
 .playwright-cli/
+.env
