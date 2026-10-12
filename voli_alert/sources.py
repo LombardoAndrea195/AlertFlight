@@ -1,10 +1,12 @@
 import logging
 import re
+import threading
 import time
 from dataclasses import dataclass
 from datetime import date, timedelta
 
 import requests
+from curl_cffi import requests as cffi
 
 from .periods import Window
 
@@ -281,24 +283,36 @@ def _vueling_link(origin: str, dest: str, out: date, back: date | None = None) -
             f"{f'&rd={back}' if back else ''}&adt=1&chd=0&inf=0&c=it&cur=EUR")
 
 
-LH_HEADERS = {"X-Portal": "LH", "X-Portal-Language": "en", "X-Portal-Site": "IT"}
+LH_HEADERS = {"X-Portal": "LH", "X-Portal-Language": "en", "X-Portal-Site": "IT", "Accept": "application/json"}
+# From GitHub Actions IPs Lufthansa (Cloudflare) refuses plain requests and Iberia (Akamai) refuses Chrome's
+# fingerprint: both accept curl_cffi impersonating Firefox
+BROWSER = "firefox"
+_local = threading.local()
+
+
+def _browser() -> cffi.Session:
+    """One curl_cffi session per thread: sessions are not thread-safe."""
+    if not hasattr(_local, "session"):
+        _local.session = cffi.Session(impersonate=BROWSER, timeout=60)
+    return _local.session
 
 
 def lufthansa_destinations(home: str) -> list[str]:
     """Cities Lufthansa Group advertises from home (a curated list, including long haul)."""
-    data = _get(f"https://www.lufthansa.com/service/api/lhg-fare-teaser/fareteaser/offers/{home}", headers=LH_HEADERS,
-                body={"touchPointId": "200", "decisionTypeId": "50", "tripType": "R",
-                      "timestamp": f"{date.today()}T00:00:00.000Z", "timezone": 0})
-    return [o["city"] for o in data["fareTeaserOffers"]]
+    r = _browser().post(f"https://www.lufthansa.com/service/api/lhg-fare-teaser/fareteaser/offers/{home}",
+                        headers=LH_HEADERS, json={"touchPointId": "200", "decisionTypeId": "50", "tripType": "R",
+                                                  "timestamp": f"{date.today()}T00:00:00.000Z", "timezone": 0})
+    r.raise_for_status()
+    return [o["city"] for o in r.json()["fareTeaserOffers"]]
 
 
 def lufthansa(origin: str, dest: str, w: Window, out: list[date], geo: Geo) -> list[Offer]:
     """Cheapest Lufthansa Group round trip for each date pair. The API gives no flight times."""
     offers = []
     for d in out:
-        r = requests.post("https://www.lufthansa.com/service/api/teaser/offerbyday", headers=HEADERS | LH_HEADERS,
-                          json={"cabin": "E", "tripType": "R", "origin": origin, "destination": dest,
-                                "outboundDate": str(d), "returnDate": str(w.end)}, timeout=30)
+        r = _browser().post("https://www.lufthansa.com/service/api/teaser/offerbyday", headers=LH_HEADERS,
+                            json={"cabin": "E", "tripType": "R", "origin": origin, "destination": dest,
+                                  "outboundDate": str(d), "returnDate": str(w.end)})
         r.raise_for_status()
         if r.status_code == 204:  # no fare on these dates
             continue
@@ -312,18 +326,13 @@ def lufthansa(origin: str, dest: str, w: Window, out: list[date], geo: Geo) -> l
 
 
 class Iberia:
-    """Iberia fare calendar: round-trip prices for 7×7 date pairs, no flight times.
-
-    Behind Akamai: plain requests get 403, so it goes through curl_cffi impersonating Chrome.
-    """
+    """Iberia fare calendar: round-trip prices for 7×7 date pairs, no flight times. Behind Akamai."""
 
     AUTH = "https://ibisauth.iberia.com/api/auth/realms/commercial_platform/protocol/openid-connect/token"
     WEB_APP = "Basic aWJlcmlhX3dlYjo5ZGM4NzZjYi0xMDVkLTQ4MWItODM4Yy01NGUyNGQ3NDEwYzk="  # public, from iberia.com
 
     def __init__(self) -> None:
-        from curl_cffi import requests as cffi
-
-        self.session = cffi.Session(impersonate="chrome", timeout=60)
+        self.session = cffi.Session(impersonate=BROWSER, timeout=60)
         self.token_until = 0.0
 
     def _auth(self) -> None:

@@ -22,7 +22,9 @@ Ogni mattina controlla **tutti i weekend e i ponti dei prossimi 12 mesi**, cerca
    - **Wizz Air** (gratis, prezzi in tempo reale, voli diretti): una richiesta per tratta ogni 42 giorni. Wizz Air blocca chi va troppo veloce, quindi si fa una richiesta ogni 2 secondi circa: la ricerca completa dura una mezz'ora, in parallelo alle altre.
    - **Vueling** (gratis, prezzi in tempo reale, solo da Fiumicino): il volo più economico di ogni giorno, con l'orario, per le tratte dirette (Madrid, Barcellona, Ibiza, Bilbao, Tenerife, Parigi, Londra). La cache di Vueling a volte risponde con un'altra tratta: in quel caso si aspetta che scada (circa 5 minuti) e si riprova, su 4 code in parallelo.
    - **Lufthansa** (gratis, tutto il gruppo: Lufthansa, Swiss, Austrian, Brussels...): solo andata e ritorno, per le mete che Lufthansa pubblicizza da Roma. Dà il prezzo per ogni coppia di date ma **non l'orario né gli scali**.
-   - **Iberia** (gratis, Roma–Madrid): solo andata e ritorno, **senza orario**. Il sito di Iberia blocca i programmi, quindi le richieste passano da `curl_cffi`, che si presenta come Chrome.
+   - **Iberia** (gratis, Roma–Madrid): solo andata e ritorno, **senza orario**.
+
+   Lufthansa e Iberia bloccano i programmi che girano sui server di GitHub: le loro richieste passano da `curl_cffi`, che si presenta come Firefox.
    - **Travelpayouts / Aviasales** (gratis con token): **tutte le compagnie e tutto il mondo, compresi i voli intercontinentali** e con scalo. Dati in cache delle ultime 48 ore.
 
    easyJet e ITA Airways non hanno un'API utilizzabile (easyJet blocca ogni richiesta, ITA mostra solo prezzi per viaggi di 14 giorni): i loro voli arrivano solo da Travelpayouts.
