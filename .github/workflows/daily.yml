@@ -48,14 +48,19 @@ jobs:
 
       # Frontend-only change: republish the page with the data already online
       - name: Recupera i dati pubblicati
+        id: data
         if: github.event_name == 'push'
         run: |
-          git fetch --depth=1 origin render && git show origin/render:data.json > site/data.json \
-            || { echo "Nessun dato pubblicato, lancia il workflow a mano"; exit 1; }
+          if git fetch --depth=1 origin render && git show origin/render:data.json > site/data.json; then
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::Nessun dato pubblicato: lancia il workflow a mano (Run workflow) per la prima ricerca"
+          fi
 
       # Render serves the `render` branch as a static site and redeploys on every push.
       # The branch holds only the latest page, so its history does not grow.
       - name: Pubblica su Render
+        if: github.event_name != 'push' || steps.data.outputs.ok == 'true'
         run: |
           cd site
           git init -q -b render
