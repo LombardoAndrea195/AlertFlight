@@ -10,8 +10,6 @@ on:
 
 permissions:
   contents: write
-  pages: write
-  id-token: write
 
 concurrency:
   group: voli-alert
@@ -20,9 +18,13 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v7
+
+      - run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
       # Daily run (or manual): search fares, send Telegram, write site/data.json
       - if: github.event_name != 'push'
@@ -38,8 +40,6 @@ jobs:
       - name: Salva lo storico prezzi
         if: github.event_name != 'push'
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add data/state.json
           git diff --cached --quiet && exit 0
           git commit -m "Storico prezzi $(date -u +%F)"
@@ -47,26 +47,18 @@ jobs:
           git push
 
       # Frontend-only change: republish the page with the data already online
-      - id: pages
-        if: github.event_name == 'push'
-        uses: actions/configure-pages@v6
-
       - name: Recupera i dati pubblicati
         if: github.event_name == 'push'
         run: |
-          curl -fsSL "${{ steps.pages.outputs.base_url }}/data.json" -o site/data.json \
-            || echo "Nessun dato pubblicato, lancia il workflow a mano"
+          git fetch --depth=1 origin render && git show origin/render:data.json > site/data.json \
+            || { echo "Nessun dato pubblicato, lancia il workflow a mano"; exit 1; }
 
-      - uses: actions/upload-pages-artifact@v5
-        with:
-          path: site
-
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - id: deployment
-        uses: actions/deploy-pages@v5
+      # Render serves the `render` branch as a static site and redeploys on every push.
+      # The branch holds only the latest page, so its history does not grow.
+      - name: Pubblica su Render
+        run: |
+          cd site
+          git init -q -b render
+          git add -A --force
+          git commit -qm "Pagina $(date -u +%F)"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" render

@@ -71,3 +71,9 @@ def test_one_way_times():
     assert not times_ok(leg("2026-10-16T09:00", "andata"), t)  # friday morning needs a day off
     assert times_ok(leg("2026-10-18T19:00", "ritorno"), t)
     assert not times_ok(leg("2026-10-18T08:00", "ritorno"), t)  # sunday morning wastes the day
+
+
+def test_dates_without_times_are_kept():
+    t = {"day_before_from": "17:00", "first_day_until": "14:00", "return_from": "12:00"}
+    w = windows(date(2026, 10, 11), 7, 1, "RM")[0]
+    assert times_ok(Offer(w, "MAD", 200, "2026-10-16", "2026-10-18", "FCO", "MAD", 0, "Iberia", ""), t)

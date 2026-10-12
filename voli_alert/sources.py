@@ -23,7 +23,7 @@ class Offer:
     ret: str
     origin_airport: str
     dest_airport: str
-    stops: int
+    stops: int  # -1 when the source does not say
     carrier: str
     link: str
     trip: str = "ar"  # "ar" round trip; "andata" / "ritorno" one-way leg, with ret = ""
@@ -205,6 +205,163 @@ def _wizz_link(origin: str, dest: str, out: date, back: date | None = None) -> s
 
 def _wizz_priced(f: dict) -> bool:
     return f.get("priceType") == "price" and f["price"]["currencyCode"] == "EUR" and f["price"]["amount"] > 0
+
+
+class Vueling:
+    """Vueling low-fare calendar: the cheapest flight of each day for a year, one direction per call.
+
+    The CDN caches each path for 5 minutes ignoring the query string, so it may answer with another
+    route: the answer is checked and, if wrong, asked again once the cached copy expires. Each path
+    variant has its own cache, so routes are spread across them and fetched in parallel.
+    """
+
+    API = "https://apiw.vueling.com/api"
+    PATHS = ["v1/availability", "v1/availability/", "v2/availability", "v2/availability/"]
+
+    def __init__(self, airports: list[str], tries: int) -> None:
+        self.tries = tries
+        stations = _get("https://static.vueling.com/corporativeCMS/Stations/it-IT.json")["stations"]["value"]
+        self.routes, self.names = [], {}
+        for s in stations:
+            if s["code"] not in airports:
+                continue
+            direct = {r["code"] for r in s["routes"] if not r["isConnection"]}  # includes city groups like PAR
+            for r in s["routes"]:
+                if (r["code"] in direct and not r["isMac"]) or r["macCode"] in direct:
+                    self.routes.append((s["code"], r["code"]))
+                    self.names[r["code"]] = r["name"]
+
+    def _calendar(self, path: str, origin: str, dest: str) -> list[dict]:
+        params = {"originCode": origin, "destinationCode": dest, "currencyCode": "EUR",
+                  "providerName": "DmpsRetrieveAvailabilityProvider"}
+        if path.startswith("v2"):
+            params["includeSummary"] = "true"
+        for _ in range(self.tries):
+            r = requests.get(f"{self.API}/{path}", params=params, headers=HEADERS, timeout=30)
+            r.raise_for_status()
+            value = r.json()["availability"]["value"]
+            flights = value["data"] if isinstance(value, dict) else value
+            if not flights or (flights[0]["departureStation"], flights[0]["arrivalStation"]) == (origin, dest):
+                return flights
+            m = re.search(r"max-age=(\d+)", r.headers.get("Cache-Control", ""))
+            time.sleep(int(m[1]) + 1 if m else 60)
+        raise RuntimeError(f"Vueling {origin}-{dest}: the cache keeps answering with another route")
+
+    def offers(self, path: str, origin: str, dest: str, trips: list[tuple[Window, date]], geo: Geo) -> list[Offer]:
+        def by_day(o: str, d: str) -> dict[str, dict]:
+            return {f["departureDate"][:10]: f for f in self._calendar(path, o, d)
+                    if f["currency"] == "EUR" and f["price"] > 0 and not f["isInvalidPrice"]}
+
+        out, inb = by_day(origin, dest), by_day(dest, origin)
+        city = geo.city_of(dest)
+        if not geo.city_name.get(city, "").strip() or geo.city_name[city].startswith("Aeroporto"):
+            geo.city_name[city] = self.names.get(dest, dest)
+        offers = []
+        for w, d in trips:
+            o, i = out.get(str(d)), inb.get(str(w.end))
+            if o:
+                offers.append(Offer(w, city, o["price"], o["departureDate"][:16], "", origin, dest,
+                                    _vueling_stops(o), "Vueling", _vueling_link(origin, dest, d), "andata"))
+            if i:
+                offers.append(Offer(w, city, i["price"], i["departureDate"][:16], "", dest, origin,
+                                    _vueling_stops(i), "Vueling", _vueling_link(dest, origin, w.end), "ritorno"))
+            if o and i:
+                offers.append(Offer(w, city, o["price"] + i["price"], o["departureDate"][:16],
+                                    i["departureDate"][:16], origin, dest, max(_vueling_stops(o), _vueling_stops(i)),
+                                    "Vueling", _vueling_link(origin, dest, d, w.end)))
+        return offers
+
+
+def _vueling_stops(f: dict) -> int:
+    return 1 if f.get("isConnectionFlight") else 0
+
+
+def _vueling_link(origin: str, dest: str, out: date, back: date | None = None) -> str:
+    return (f"https://tickets.vueling.com/booking/flightSearch?o={origin}&d={dest}&dd={out}"
+            f"{f'&rd={back}' if back else ''}&adt=1&chd=0&inf=0&c=it&cur=EUR")
+
+
+LH_HEADERS = {"X-Portal": "LH", "X-Portal-Language": "en", "X-Portal-Site": "IT"}
+
+
+def lufthansa_destinations(home: str) -> list[str]:
+    """Cities Lufthansa Group advertises from home (a curated list, including long haul)."""
+    data = _get(f"https://www.lufthansa.com/service/api/lhg-fare-teaser/fareteaser/offers/{home}", headers=LH_HEADERS,
+                body={"touchPointId": "200", "decisionTypeId": "50", "tripType": "R",
+                      "timestamp": f"{date.today()}T00:00:00.000Z", "timezone": 0})
+    return [o["city"] for o in data["fareTeaserOffers"]]
+
+
+def lufthansa(origin: str, dest: str, w: Window, out: list[date], geo: Geo) -> list[Offer]:
+    """Cheapest Lufthansa Group round trip for each date pair. The API gives no flight times."""
+    offers = []
+    for d in out:
+        r = requests.post("https://www.lufthansa.com/service/api/teaser/offerbyday", headers=HEADERS | LH_HEADERS,
+                          json={"cabin": "E", "tripType": "R", "origin": origin, "destination": dest,
+                                "outboundDate": str(d), "returnDate": str(w.end)}, timeout=30)
+        r.raise_for_status()
+        if r.status_code == 204:  # no fare on these dates
+            continue
+        f = r.json()
+        if f["currency"] == "EUR" and f["price"] > 0:
+            link = (f"https://www.lufthansa.com/it/it/homepage?OriginCode={origin}&DestinationCode={dest}&TripType=R"
+                    f"&DepartureDate={d}&ReturnDate={w.end}&PaxAdults=1&Cabin=E")
+            offers.append(Offer(w, geo.city_of(dest), f["price"], str(d), str(w.end), origin, dest, -1, "Lufthansa",
+                                link))
+    return offers
+
+
+class Iberia:
+    """Iberia fare calendar: round-trip prices for 7×7 date pairs, no flight times.
+
+    Behind Akamai: plain requests get 403, so it goes through curl_cffi impersonating Chrome.
+    """
+
+    AUTH = "https://ibisauth.iberia.com/api/auth/realms/commercial_platform/protocol/openid-connect/token"
+    WEB_APP = "Basic aWJlcmlhX3dlYjo5ZGM4NzZjYi0xMDVkLTQ4MWItODM4Yy01NGUyNGQ3NDEwYzk="  # public, from iberia.com
+
+    def __init__(self) -> None:
+        from curl_cffi import requests as cffi
+
+        self.session = cffi.Session(impersonate="chrome", timeout=60)
+        self.token_until = 0.0
+
+    def _auth(self) -> None:
+        if time.monotonic() < self.token_until:
+            return
+        r = self.session.post(self.AUTH, headers={"Authorization": self.WEB_APP}, data={"grant_type": "client_credentials"})
+        r.raise_for_status()
+        t = r.json()
+        self.session.headers["Authorization"] = f"Bearer {t['access_token']}"
+        self.token_until = time.monotonic() + t["expires_in"] - 60
+
+    def offers(self, origin: str, dest: str, w: Window, out: list[date], geo: Geo) -> list[Offer]:
+        self._auth()
+        slices = [{"origin": a, "destination": b, "date": str(d), "daysBefore": 3, "daysAfter": 3}
+                  for a, b, d in ((origin, dest, w.start), (dest, origin, w.end))]
+        r = self.session.post("https://ibisservices.iberia.com/api/sse-avm/rs/v2/calendar",
+                              json={"marketCode": "IT", "passengers": [{"passengerType": "ADULT", "count": 1}],
+                                    "slices": slices})
+        r.raise_for_status()
+        grid = r.json()["calendarGrid"]
+        back = [c["inboundDate"] for c in grid["columns"]]
+        offers = []
+        for row in grid["rows"]:
+            d = date.fromisoformat(row["outboundDate"])
+            if d not in out:
+                continue
+            cell = row["cells"][back.index(str(w.end))]
+            price = cell.get("adultPrice") or {}
+            if cell.get("available") and price.get("currency") == "EUR" and price.get("total"):
+                offers.append(Offer(w, geo.city_of(dest), price["total"], str(d), str(w.end), origin, dest, 0,
+                                    "Iberia", _iberia_link(origin, dest, d, w.end)))
+        return offers
+
+
+def _iberia_link(origin: str, dest: str, out: date, back: date) -> str:
+    return (f"https://www.iberia.com/flights/?market=IT&language=it&TRIP_TYPE=2&BEGIN_CITY_01={origin}"
+            f"&END_CITY_01={dest}&BEGIN_DAY_01={out.day}&BEGIN_MONTH_01={out:%Y%m}&END_DAY_01={back.day}"
+            f"&END_MONTH_01={back:%Y%m}&ADT=1&CHD=0&INF=0&BNN=0&YTH=0&YCD=0&FARE_TYPE=R")
 
 
 def travelpayouts(token: str, home: str, w: Window, out: date, trip: str = "ar") -> list[Offer]:

@@ -12,7 +12,7 @@ const esc = (s) => String(s).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`)
 const fold = (s) => s.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
 const day = (iso) => { const [y, m, d] = iso.slice(0, 10).split("-").map(Number); return new Date(y, m - 1, d); };
 const fmtDay = (iso) => { const d = day(iso); return `${DOW[d.getDay()]} ${d.getDate()} ${MON[d.getMonth()]}`; };
-const fmtWhen = (iso) => `${fmtDay(iso)} ${iso.slice(11, 16)}`;
+const fmtWhen = (iso) => (iso.length > 10 ? `${fmtDay(iso)} ${iso.slice(11, 16)}` : fmtDay(iso));
 const daysBetween = (a, b) => Math.round((day(b) - day(a)) / 864e5);
 
 function rangeTitle(w) {
@@ -32,7 +32,7 @@ const off = (f) => Math.round((1 - f.p / f.r) * 100);
 const rot = (f) => ((f.w * 7 + f.c.charCodeAt(0) * 13 + f.c.charCodeAt(1)) % 11) - 6;
 
 function matches(f) {
-  if (state.onlyDirect && f.s > 0) return false;
+  if (state.onlyDirect && f.s !== 0) return false;
   if (state.budget != null && f.p > state.budget) return false;
   if (state.onlyLong && data.windows[f.w].kind === "weekend") return false;
   if (state.onlyDeals && !f.deal) return false;
@@ -48,7 +48,8 @@ function matches(f) {
 
 function fareRow(f, i) {
   const [name, country] = data.places[f.c] || [f.c, ""];
-  const stops = f.s === 0 ? "diretto" : f.s === 1 ? "1 scalo" : `${f.s} scali`;
+  const stops = f.s < 0 ? "scali da verificare" : f.s === 0 ? "diretto" : f.s === 1 ? "1 scalo" : `${f.s} scali`;
+  const unknown = f.d.length > 10 ? "" : " · orario da verificare";
   const cls = ["fare", f.deal && "is-deal", f.deal && f.n && "is-new"].filter(Boolean).join(" ");
   const typical = f.r != null ? `<small>tipico ${eur.format(f.r)}</small>` : "";
   const stamp = f.deal
@@ -61,7 +62,7 @@ function fareRow(f, i) {
   return `<li class="${cls}">
     <div class="place"><span class="place-name">${esc(name)}</span><span class="place-country">${esc(country)}</span></div>
     <div class="trip"><span class="route">${esc(f.o)}–${esc(f.a)}</span> · ${stops} · ${esc(f.k)}<br>
-      <span class="when">${f.b ? `${fmtWhen(f.d)} → ${fmtWhen(f.b)}` : fmtWhen(f.d)}</span></div>
+      <span class="when">${f.b ? `${fmtWhen(f.d)} → ${fmtWhen(f.b)}` : fmtWhen(f.d)}${unknown}</span></div>
     <div class="price"><b>${eur.format(f.p)}</b>${typical}</div>
     <div class="stamp-cell">${stamp}</div>
     ${book}
@@ -174,7 +175,7 @@ function renderMeta() {
   ].join(" · ");
 
   $("#colophon").innerHTML = `
-    <p>Prezzi per 1 adulto da ${esc(data.origin)}, il più basso per ogni meta e periodo. <b>Andata e ritorno</b>: si parte la sera prima o il primo giorno libero e si rientra l'ultimo giorno. <b>Solo andata</b> e <b>solo ritorno</b> mostrano il singolo volo, con gli stessi orari. I prezzi possono cambiare al momento della prenotazione.</p>
+    <p>Prezzi per 1 adulto da ${esc(data.origin)}, il più basso per ogni meta e periodo. <b>Andata e ritorno</b>: si parte la sera prima o il primo giorno libero e si rientra l'ultimo giorno. <b>Solo andata</b> e <b>solo ritorno</b> mostrano il singolo volo, con gli stessi orari. Lufthansa e Iberia danno solo il giorno, non l'orario: controllalo prima di prenotare. I prezzi possono cambiare al momento della prenotazione.</p>
     <p>Un prezzo è <b>anomalo</b> se costa almeno il ${Math.round(data.rules.discount * 100)}% in meno del prezzo tipico di quella meta e fa risparmiare almeno ${eur.format(data.rules.min_saving_eur)}. Il prezzo tipico è la mediana delle tariffe degli ultimi 90 giorni, separata per andata e ritorno, solo andata e solo ritorno. <b>Nuovo</b> vuol dire segnalato oggi su Telegram (solo per andata e ritorno).</p>`;
 }
 

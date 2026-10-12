@@ -8,7 +8,7 @@ web
 
 ## Stack
 
-Static HTML/CSS/JS with no build step, published on GitHub Pages by the daily GitHub Action. The page reads `data.json`, which the Python job (`voli_alert`) writes on every run.
+Static HTML/CSS/JS with no build step. The daily GitHub Action runs the Python job (`voli_alert`), which writes `data.json`, and publishes `site/` to the `render` branch, served as a Render static site (`render.yaml`).
 
 ## Users
 
@@ -25,14 +25,14 @@ Unlike Google Flights or Skyscanner "Everywhere", it is organised around the own
 ## Operating Context
 
 - Daily cron on GitHub Actions; Telegram alert for new anomalies; the web page for browsing.
-- Sources: Ryanair fare finder (live, direct flights) and Travelpayouts/Aviasales (cached data from the last 48 h, all airlines, worldwide; optional token).
+- Sources: Ryanair, Wizz Air and Vueling (live, direct flights, with times), Lufthansa Group and Iberia (round trip only, dates without times: shown as "orario da verificare"), and Travelpayouts/Aviasales (cached data from the last 48 h, all airlines, worldwide; optional token). easyJet and ITA have no usable API.
 - Prices are round trip, in EUR, for 1 adult. They can change by booking time.
 
 ## Capabilities and Constraints
 
 - Periods: weekends + holidays from `holidays` (IT, subdiv RM); one leave day bridges a Tuesday/Thursday holiday.
 - "Anomaly" = at least 50% below the destination's typical price (the median of daily medians over 90 days) and at least €15 saved. Configurable in `config.toml`.
-- Public GitHub Pages site and public repository; secrets stay in Actions secrets.
+- Public Render static site; secrets stay in GitHub Actions secrets.
 - Italian UI.
 
 ## Evidence on Hand
