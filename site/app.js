@@ -259,8 +259,37 @@ function drawGuilloche() {
   svg.innerHTML = `<g fill="none" stroke="#E2C48A" stroke-width=".6" stroke-opacity=".35">${paths.join("")}</g>`;
 }
 
+function bindPromos() {
+  const section = $("#promos");
+  const today = new Date().toLocaleDateString("sv");
+  for (const p of section.querySelectorAll(".promo")) if (p.dataset.until < today) p.remove();
+  if (!section.querySelector(".promo")) section.querySelector(".promo-list").remove();
+
+  section.addEventListener("click", async (e) => {
+    const b = e.target.closest("[data-copy]");
+    if (!b) return;
+    try {
+      await navigator.clipboard.writeText(b.dataset.copy);
+      b.textContent = "Copiato";
+    } catch {
+      b.textContent = "Non copiato";
+    }
+    clearTimeout(b.t);
+    b.t = setTimeout(() => { b.textContent = "Copia link"; }, 1600);
+  });
+
+  if (matchMedia("(max-width: 52rem)").matches) {
+    const s = document.createElement("script");
+    s.async = true;
+    s.charset = "utf-8";
+    s.src = "https://tpwgts.com/content?trs=584480&shmarker=788519&locale=en&powered_by=true&border_radius=5&plain=true&color_background=%23ffffff&color_button=%235080c5&promo_id=5472&campaign_id=57";
+    $("#promoWidget").append(s);
+  }
+}
+
 async function start() {
   drawGuilloche();
+  bindPromos();
   try {
     Object.assign(state, JSON.parse(localStorage.getItem(STORE) || "{}"));
   } catch { /* corrupted preferences: keep defaults */ }

@@ -404,6 +404,31 @@ a.cell:focus-visible { background: var(--ink); outline-offset: 1px; }
 .state button { font: 600 var(--fs-xs)/1 var(--sans); padding: 0.55rem 0.9rem; border: 1px solid var(--ink); border-radius: 3px; background: none; color: var(--ink); cursor: pointer; }
 .state.is-error h2 { color: var(--red); }
 
+/* Promo codes */
+
+.promos { max-width: var(--measure); margin: 0 auto; padding: 0 var(--pad-r) 1rem var(--pad-l); }
+.promos-title {
+  margin: 0 0 0.6rem;
+  font: 400 var(--fs-xs)/1.2 var(--mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+.promo-list { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--ink); }
+.promo {
+  display: grid;
+  grid-template-columns: minmax(12rem, 1.6fr) minmax(10rem, 1fr) 4.5rem auto;
+  align-items: center;
+  gap: 0 1.25rem;
+  padding: 0.7rem 0.5rem;
+  border-bottom: 1px solid var(--rule);
+}
+.promo-when { font-size: var(--fs-xs); color: var(--ink-2); }
+.promo-off { font: 600 var(--fs-md)/1.1 var(--mono); letter-spacing: -0.02em; text-align: right; }
+.promo-actions { display: flex; gap: 0.5rem; justify-content: end; }
+button.book { appearance: none; margin: 0; background: none; color: var(--ink); font-family: inherit; cursor: pointer; }
+.promo-widget:not(:empty) { margin-top: 1.5rem; }
+
 .colophon {
   max-width: var(--measure);
   margin: 0 auto;
@@ -422,6 +447,7 @@ a.cell:focus-visible { background: var(--ink); outline-offset: 1px; }
   .toggle:hover span { border-color: var(--ink-2); color: var(--ink); }
   .fare:hover, .dest:hover { background: var(--paper-2); }
   .book:hover, .state button:hover { background: var(--ink); color: var(--paper); }
+  .promo:hover { background: var(--paper-2); }
   .more:hover { color: var(--violet); }
   a.cell:hover { background: var(--ink); }
 }
@@ -475,6 +501,17 @@ a.cell:focus-visible { background: var(--ink); outline-offset: 1px; }
   .dest-head .months, .dest .strip { grid-column: 1 / -1; }
   .dest .price { text-align: right; }
   .months span { padding-left: 2px; font-size: 0.6875rem; letter-spacing: 0; }
+
+  .promo {
+    grid-template-columns: 1fr auto;
+    grid-template-areas: "place off" "when when" "actions actions";
+    gap: 0.35rem 1rem;
+    padding: 0.85rem 0.25rem;
+  }
+  .promo .place { grid-area: place; }
+  .promo-off { grid-area: off; }
+  .promo-when { grid-area: when; }
+  .promo-actions { grid-area: actions; justify-content: start; }
 }
 
 @media (prefers-reduced-motion: reduce) {
