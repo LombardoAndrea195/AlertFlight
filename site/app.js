@@ -187,7 +187,7 @@ function renderMeta() {
   $("#colophon").innerHTML = `
     <p>Prezzi per 1 adulto da ${esc(data.origin)}, il più basso per ogni meta e periodo. <b>Andata e ritorno</b>: si parte la sera prima o il primo giorno libero e si rientra l'ultimo giorno. <b>Solo andata</b> e <b>solo ritorno</b> mostrano il singolo volo, con gli stessi orari. Per alcune compagnie si conosce solo il giorno, non l'orario: controllalo prima di prenotare. I prezzi possono cambiare al momento della prenotazione.</p>
     <p>Un prezzo è <b>anomalo</b> se costa almeno il ${Math.round(data.rules.discount * 100)}% in meno del prezzo tipico di quella meta e fa risparmiare almeno ${eur.format(data.rules.min_saving_eur)}. Il prezzo tipico è la mediana delle tariffe degli ultimi 90 giorni, separata per andata e ritorno, solo andata e solo ritorno. <b>Nuovo</b> vuol dire segnalato su Telegram nell'ultima ricerca (solo per andata e ritorno).</p>
-    <p>Alcuni link sono di affiliazione (Aviasales, Booking.com e i codici sconto): se prenoti da lì il sito riceve una piccola commissione, senza costi in più per te. La pagina mostra anche annunci di Google.</p>`;
+    <p>Alcuni link sono di affiliazione (Aviasales, Booking.com e i codici sconto): se prenoti da lì il sito riceve una piccola commissione, senza costi in più per te.</p>`;
 }
 
 function syncControls() {
