@@ -1,4 +1,4 @@
-# Static site on Render. The GitHub Action publishes the page (site/ + data.json) to the `render` branch every day.
+# Static site on Render. The GitHub Action publishes the page (site/ + data.json) to the `render` branch three times a day.
 services:
   - type: web
     runtime: static

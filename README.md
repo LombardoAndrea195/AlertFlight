@@ -1,14 +1,14 @@
 # Voli economici da Roma per weekend e ponti
 
-Ogni mattina controlla **tutti i weekend e i ponti dei prossimi 12 mesi**, cerca i voli da Roma (FCO + CIA) verso qualsiasi destinazione, **andata e ritorno, solo andata e solo ritorno**, e:
+Tre volte al giorno (alle 8, alle 14 e alle 20) controlla **tutti i weekend e i ponti dei prossimi 12 mesi**, cerca i voli da Roma (FCO + CIA) verso qualsiasi destinazione, **andata e ritorno, solo andata e solo ritorno**, e:
 
 - ti manda su **Telegram** i nuovi voli andata e ritorno con un **prezzo anomalo** (almeno il 50% sotto il prezzo tipico di quella meta);
-- pubblica una **pagina web** su Render con tutte le tariffe del giorno, comoda anche da telefono.
+- pubblica una **pagina web** su Render con tutte le tariffe dell'ultima ricerca, comoda anche da telefono.
 
 ## La pagina
 
 - **Tipo di viaggio**: andata e ritorno, solo andata (Roma → meta) o solo ritorno (meta → Roma).
-- **Periodi**: ogni weekend o ponte, con la data e le mete più economiche. I prezzi anomali hanno un timbro (verde se trovati oggi, viola se già segnalati).
+- **Periodi**: ogni weekend o ponte, con la data e le mete più economiche. I prezzi anomali hanno un timbro (verde se trovati nell'ultima ricerca, viola se già segnalati).
 - **Mete**: per ogni destinazione, una barra per ogni periodo dell'anno (più alta = più cara). Così vedi subito quando conviene andarci. Tocca una barra per prenotare.
 - **Filtri**: solo prezzi anomali, solo ponti e feste, solo voli diretti, budget massimo, ricerca per meta o paese. Vengono ricordati dal browser.
 
@@ -32,11 +32,11 @@ Ogni mattina controlla **tutti i weekend e i ponti dei prossimi 12 mesi**, cerca
 4. **Prezzo anomalo**: il prezzo tipico di ogni meta è la mediana dei prezzi su tutti i periodi negli ultimi 90 giorni, calcolata a parte per andata e ritorno, solo andata e solo ritorno. È anomalo se costa almeno il 50% in meno e fa risparmiare almeno 15 €.
 5. **Niente doppioni** su Telegram: lo stesso volo viene segnalato di nuovo solo se scende di un altro 10%.
 
-La pagina mostra solo i dati dell'ultima ricerca e i periodi futuri. Lo storico in `data/state.json` (pochi KB) tiene solo il prezzo mediano per meta degli ultimi 90 giorni, che serve a riconoscere i prezzi anomali; viene salvato con un commit giornaliero. Soglie, orari e fonti sono in `config.toml`.
+La pagina mostra solo i dati dell'ultima ricerca e i periodi futuri. Lo storico in `data/state.json` (pochi KB) tiene solo il prezzo mediano per meta degli ultimi 90 giorni (uno al giorno: l'ultima ricerca della giornata sostituisce le precedenti), che serve a riconoscere i prezzi anomali; viene salvato con un commit a ogni ricerca. Soglie, orari e fonti sono in `config.toml`.
 
 ## Pubblicazione (una sola volta)
 
-La ricerca gira ogni giorno su **GitHub Actions** (gratis), che salva lo storico e pubblica la pagina sul branch `render`. Un **sito statico Render** (gratis) serve quel branch e si aggiorna da solo a ogni pubblicazione.
+La ricerca gira tre volte al giorno su **GitHub Actions** (gratis), che salva lo storico e pubblica la pagina sul branch `render`. Un **sito statico Render** (gratis) serve quel branch e si aggiorna da solo a ogni pubblicazione.
 
 1. **Repository**: crea un repository su GitHub (anche privato) e carica questa cartella:
    ```sh
@@ -59,7 +59,7 @@ Senza i secret Telegram il workflow funziona lo stesso: aggiorna solo la pagina.
 
 | Quando | Cosa fa |
 |---|---|
-| Ogni giorno alle 8:00 (7:00 d'inverno) o con *Run workflow* | Cerca i voli (40-60 minuti, per via di Wizz Air, Vueling e Lufthansa), invia Telegram, salva lo storico, pubblica la pagina sul branch `render` |
+| Ogni giorno alle 8:00, 14:00 e 20:00 (un'ora prima d'inverno) o con *Run workflow* | Cerca i voli (40-60 minuti, per via di Wizz Air, Vueling e Lufthansa), invia Telegram, salva lo storico, pubblica la pagina sul branch `render` |
 | Push su `main` che cambia `site/` o il workflow | Ripubblica solo la pagina, riusando i dati già online (nessuna ricerca, nessun messaggio) |
 
 Il branch `render` contiene solo l'ultima versione della pagina (viene sovrascritto ogni volta), quindi la sua storia non cresce.

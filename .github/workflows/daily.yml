@@ -2,7 +2,7 @@ name: Voli economici
 
 on:
   schedule:
-    - cron: "0 6 * * *" # 8:00 ora italiana (7:00 d'inverno)
+    - cron: "0 6,12,18 * * *" # 8:00, 14:00 e 20:00 ora italiana (7:00, 13:00 e 19:00 d'inverno)
   workflow_dispatch:
   push:
     branches: [main]
@@ -26,7 +26,7 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-      # Daily run (or manual): search fares, send Telegram, write site/data.json
+      # Scheduled run (or manual): search fares, send Telegram, write site/data.json
       - if: github.event_name != 'push'
         uses: astral-sh/setup-uv@v10.3.0
 
@@ -42,7 +42,7 @@ jobs:
         run: |
           git add data/state.json
           git diff --cached --quiet && exit 0
-          git commit -m "Storico prezzi $(date -u +%F)"
+          git commit -m "Storico prezzi $(date -u '+%F %H:%M') UTC"
           git pull --rebase
           git push
 
@@ -65,5 +65,5 @@ jobs:
           cd site
           git init -q -b render
           git add -A --force
-          git commit -qm "Pagina $(date -u +%F)"
+          git commit -qm "Pagina $(date -u '+%F %H:%M') UTC"
           git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" render

@@ -53,7 +53,7 @@ function fareRow(f, i) {
   const cls = ["fare", f.deal && "is-deal", f.deal && f.n && "is-new"].filter(Boolean).join(" ");
   const typical = f.r != null ? `<small>tipico ${eur.format(f.r)}</small>` : "";
   const stamp = f.deal
-    ? `<span class="stamp" style="--rot:${rot(f)}deg;--i:${i}" title="${off(f)}% sotto il prezzo tipico${f.n ? ", trovato oggi" : ""}">
+    ? `<span class="stamp" style="--rot:${rot(f)}deg;--i:${i}" title="${off(f)}% sotto il prezzo tipico${f.n ? ", trovato nell'ultima ricerca" : ""}">
          <b>−${off(f)}%</b><small>${f.n ? "nuovo" : "anomalo"}</small></span>`
     : "";
   const book = f.l
@@ -139,7 +139,7 @@ function renderDestinations(fares) {
     </li>`;
   });
   return `<p class="legend"><span><i></i>prezzo per periodo, più alta = più cara</span>
-      <span><i class="l-deal"></i>anomalo</span><span><i class="l-new"></i>anomalo, nuovo oggi</span>
+      <span><i class="l-deal"></i>anomalo</span><span><i class="l-new"></i>anomalo, nuovo</span>
       <span><i class="l-kind"></i>ponte o festa</span><span>Tocca una barra per prenotare</span></p>
     <div class="dest-head"><span>Meta</span><span>Minimo</span><div class="months" style="--n:${n}">${monthHeader()}</div></div>
     <ol class="fares dests">${body.join("")}</ol>`;
@@ -171,12 +171,12 @@ function renderMeta() {
     age >= 2 ? `<span class="stale">Dati di ${age} giorni fa</span>` : `Aggiornato ${when}`,
     `<b>${data.windows.length}</b> periodi`,
     `<b>${int.format(list.length)}</b> tariffe`,
-    `<b>${deals}</b> anomali${fresh ? `, <b>${fresh}</b> nuovi oggi` : ""}`,
+    `<b>${deals}</b> anomali${fresh ? `, <b>${fresh}</b> nuovi` : ""}`,
   ].join(" · ");
 
   $("#colophon").innerHTML = `
     <p>Prezzi per 1 adulto da ${esc(data.origin)}, il più basso per ogni meta e periodo. <b>Andata e ritorno</b>: si parte la sera prima o il primo giorno libero e si rientra l'ultimo giorno. <b>Solo andata</b> e <b>solo ritorno</b> mostrano il singolo volo, con gli stessi orari. Lufthansa e Iberia danno solo il giorno, non l'orario: controllalo prima di prenotare. I prezzi possono cambiare al momento della prenotazione.</p>
-    <p>Un prezzo è <b>anomalo</b> se costa almeno il ${Math.round(data.rules.discount * 100)}% in meno del prezzo tipico di quella meta e fa risparmiare almeno ${eur.format(data.rules.min_saving_eur)}. Il prezzo tipico è la mediana delle tariffe degli ultimi 90 giorni, separata per andata e ritorno, solo andata e solo ritorno. <b>Nuovo</b> vuol dire segnalato oggi su Telegram (solo per andata e ritorno).</p>`;
+    <p>Un prezzo è <b>anomalo</b> se costa almeno il ${Math.round(data.rules.discount * 100)}% in meno del prezzo tipico di quella meta e fa risparmiare almeno ${eur.format(data.rules.min_saving_eur)}. Il prezzo tipico è la mediana delle tariffe degli ultimi 90 giorni, separata per andata e ritorno, solo andata e solo ritorno. <b>Nuovo</b> vuol dire segnalato su Telegram nell'ultima ricerca (solo per andata e ritorno).</p>`;
 }
 
 function syncControls() {
