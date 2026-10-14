@@ -269,6 +269,7 @@ main { max-width: var(--measure); margin: 0 auto; padding: 0 var(--pad-r) 4rem v
 .place { min-width: 0; }
 .place-name { display: block; font-weight: 600; line-height: 1.25; }
 .place-country { display: block; font-size: var(--fs-xs); color: var(--ink-2); }
+.hotel { display: inline-block; margin-top: 0.15rem; font-size: var(--fs-xs); color: var(--ink-2); text-underline-offset: 0.15em; }
 
 .trip { min-width: 0; font-size: var(--fs-xs); color: var(--ink-2); line-height: 1.55; }
 .trip .route { font-family: var(--mono); font-weight: 600; color: var(--ink); letter-spacing: 0.04em; }
@@ -449,6 +450,7 @@ button.book { appearance: none; margin: 0; background: none; color: var(--ink); 
   .book:hover, .state button:hover { background: var(--ink); color: var(--paper); }
   .promo:hover { background: var(--paper-2); }
   .more:hover { color: var(--violet); }
+  .hotel:hover { color: var(--ink); }
   a.cell:hover { background: var(--ink); }
 }
 

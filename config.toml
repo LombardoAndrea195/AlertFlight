@@ -13,6 +13,9 @@ delay_seconds = 0.3                 # pausa tra le richieste
 state_file = "data/state.json"
 site_data_file = "site/data.json"   # dati per la pagina web
 
+[affiliate]                         # Travelpayouts: commissione sulle prenotazioni dai link Aviasales
+marker = "788519"
+
 [wizzair]                           # Wizz Air blocca chi fa troppe richieste: si va piano
 airports = ["FCO", "CIA"]
 horizon_days = 365
@@ -35,6 +38,50 @@ airport = "FCO"
 destinations = ["MAD"]              # da Roma Iberia vola diretto solo a Madrid
 horizon_days = 365
 delay_seconds = 1
+
+# Per togliere una compagnia basta cancellare la sua sezione
+[easyjet]                           # prezzo più basso di ogni giorno, senza orari
+airports = ["FCO"]                  # easyJet non vola da Ciampino
+horizon_days = 365
+delay_seconds = 0.5
+
+[ita]                               # ITA Airways, anche voli intercontinentali e con scalo: senza orari
+airport = "FCO"
+horizon_days = 365
+workers = 5                         # richieste in parallelo (l'API è lenta)
+delay_seconds = 0.3
+
+[volotea]                           # prezzo più basso di ogni giorno, con orario
+airports = ["FCO"]
+horizon_days = 365
+delay_seconds = 0.3
+
+[transavia]                         # prezzo più basso di ogni giorno, senza orari
+airports = ["FCO"]
+horizon_days = 365
+delay_seconds = 0.5
+
+[sas]                               # prezzo più basso di ogni giorno, senza orari né scali
+airport = "FCO"
+destinations = ["CPH", "ARN", "OSL"]  # le mete dirette da Roma
+horizon_days = 365
+delay_seconds = 0.3
+
+[airbaltic]                         # prezzo più basso di ogni giorno, diretti o via Riga: senza orari
+airports = ["FCO"]
+horizon_days = 365
+delay_seconds = 0.3
+
+[pegasus]                           # prezzo più basso di ogni giorno, via Istanbul: senza orari
+airports = ["FCO"]
+horizon_days = 365
+delay_seconds = 0.5
+
+[airtrfx]                           # tariffe cercate di recente sui siti delle compagnie: solo alcune date, senza orari
+airport = "FCO"
+airlines = ["tk", "tp", "vf", "at", "ux", "af", "kl", "a3"]  # Turkish, TAP, AJet, Royal Air Maroc, Air Europa, Air France, KLM, Aegean
+horizon_days = 365
+delay_seconds = 0.3
 
 [times]                             # per escludere viaggi inutili o che richiedono ferie
 day_before_from = "17:00"           # la sera prima: partenza dopo le 17

@@ -3,7 +3,7 @@ from datetime import date
 from voli_alert.__main__ import times_ok
 from voli_alert.deals import best_per_window_city, new_alerts, reference_prices
 from voli_alert.periods import Window, windows
-from voli_alert.sources import Offer
+from voli_alert.sources import Geo, Offer, _daily, _months
 
 CFG = {"discount": 0.5, "min_saving_eur": 15, "min_samples": 5, "lookback_days": 90,
        "realert_drop": 0.10, "max_per_message": 40}
@@ -77,3 +77,26 @@ def test_dates_without_times_are_kept():
     t = {"day_before_from": "17:00", "first_day_until": "14:00", "return_from": "12:00"}
     w = windows(date(2026, 10, 11), 7, 1, "RM")[0]
     assert times_ok(Offer(w, "MAD", 200, "2026-10-16", "2026-10-18", "FCO", "MAD", 0, "Iberia", ""), t)
+
+
+def test_daily_fares_become_legs_and_round_trips():
+    w = windows(date(2026, 10, 11), 7, 1, "RM")[0]  # sat 17 - sun 18 Oct
+    trips = [(w, d) for d in w.outbound_dates(True)]
+    out = {"2026-10-16": (30.0, "2026-10-16", 0)}
+    inb = {"2026-10-18": (25.5, "2026-10-18", 1)}
+    geo = Geo.__new__(Geo)  # no network
+    geo.airport_city, geo.city_name = {}, {}
+    offers = _daily("X", "FCO", "BCN", out, inb, trips, geo, lambda *a: "")
+    assert {(o.trip, o.price, o.depart, o.ret, o.stops) for o in offers} == {
+        ("andata", 30.0, "2026-10-16", "", 0),
+        ("ritorno", 25.5, "2026-10-18", "", 1),
+        ("ar", 55.5, "2026-10-16", "2026-10-18", 1),
+    }
+
+
+def test_months():
+    w = windows(date(2026, 10, 11), 120, 1, "RM")
+    trips = [(x, x.start) for x in w]
+    assert _months(trips) == [date(2026, 10, 1), date(2026, 11, 1), date(2026, 12, 1), date(2027, 1, 1),
+                              date(2027, 2, 1)]
+    assert _months(trips, 3) == [date(2026, 10, 1), date(2027, 1, 1)]

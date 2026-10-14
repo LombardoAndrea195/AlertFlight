@@ -123,6 +123,33 @@ def iberia_lanes(cfg: dict, today: date, wins: list, geo: sources.Geo) -> list[l
     ]]
 
 
+# Config section → source searched route by route, each in its own lanes
+SOURCES = {
+    "easyjet": sources.EasyJet,
+    "ita": sources.ITA,
+    "volotea": sources.Volotea,
+    "transavia": sources.Transavia,
+    "sas": sources.SAS,
+    "airbaltic": sources.AirBaltic,
+    "pegasus": sources.Pegasus,
+    "airtrfx": sources.AirTrfx,
+}
+
+
+def source_lanes(cfg: dict, today: date, wins: list, geo: sources.Geo) -> list[tuple[list, float]]:
+    lanes = []
+    for key, make in SOURCES.items():
+        c = cfg.get(key)
+        src = c and setup(make.NAME, lambda: make(c))
+        if not src:
+            continue
+        jobs = src.jobs(trips_within(cfg, today, wins, c["horizon_days"]), geo)
+        log.info("%s: %d routes", make.NAME, len(jobs))
+        workers = c.get("workers", 1)
+        lanes += [(jobs[i::workers], c.get("delay_seconds", 0)) for i in range(workers)]
+    return lanes
+
+
 def collect(cfg: dict, today: date, geo: sources.Geo) -> tuple[list, list[sources.Offer]]:
     tp_token = os.environ.get("TRAVELPAYOUTS_TOKEN")
     if not tp_token:
@@ -137,6 +164,7 @@ def collect(cfg: dict, today: date, geo: sources.Geo) -> tuple[list, list[source
     lanes = [(lane, 0) for lane in wizz_lanes(cfg, today, wins, geo) + vueling_lanes(cfg, today, wins, geo)]
     lanes += [(lane, cfg["lufthansa"]["delay_seconds"]) for lane in lufthansa_lanes(cfg, today, wins, geo)]
     lanes += [(lane, cfg["iberia"]["delay_seconds"]) for lane in iberia_lanes(cfg, today, wins, geo)]
+    lanes += source_lanes(cfg, today, wins, geo)
     with ThreadPoolExecutor(max(len(lanes), 1)) as pool:
         slow = [pool.submit(run_lane, lane, delay) for lane, delay in lanes]
         jobs = []
@@ -167,7 +195,14 @@ def fmt_stops(stops: int) -> str:
     return {-1: "scali da verificare", 0: "diretto", 1: "1 scalo"}.get(stops, f"{stops} scali")
 
 
-def format_message(deals: list[Deal], geo: sources.Geo, origin_label: str) -> str:
+def affiliate(link: str, marker: str | None) -> str:
+    """Aviasales pays a commission on bookings that come from links with the Travelpayouts marker."""
+    if marker and "aviasales.com" in link and "marker=" not in link:
+        return f"{link}{'&' if '?' in link else '?'}marker={marker}"
+    return link
+
+
+def format_message(deals: list[Deal], geo: sources.Geo, origin_label: str, marker: str | None = None) -> str:
     lines = [f"✈️ <b>{len(deals)} voli sotto il prezzo normale da {origin_label}</b>"]
     by_window: dict[str, list[Deal]] = {}
     for d in sorted(deals, key=lambda d: (d.offer.window.start, d.offer.price)):
@@ -176,7 +211,7 @@ def format_message(deals: list[Deal], geo: sources.Geo, origin_label: str) -> st
         lines.append(f"\n🗓 <b>{html.escape(title)}</b>")
         for d in items:
             o = d.offer
-            book = f' · <a href="{html.escape(o.link)}">prenota</a>' if o.link else ""
+            book = f' · <a href="{html.escape(affiliate(o.link, marker))}">prenota</a>' if o.link else ""
             unknown = "" if has_time(o.depart) else " · orario da verificare"
             lines.append(
                 f"• <b>{html.escape(geo.label(o.city))}</b> — <b>{o.price:.0f} €</b> "
@@ -217,6 +252,7 @@ def site_data(cfg, wins, trips: dict, deals, geo: sources.Geo) -> dict:
     index = {w.id: i for i, w in enumerate(wins)}
     alerted = {(d.offer.window.id, d.offer.city) for d in deals}
     cities = {o.city for best, _ in trips.values() for o in best.values()}
+    marker = cfg.get("affiliate", {}).get("marker")
 
     def fares(trip: str) -> list[dict]:
         best, refs = trips[trip]
@@ -232,7 +268,7 @@ def site_data(cfg, wins, trips: dict, deals, geo: sources.Geo) -> dict:
                 "a": o.dest_airport,
                 "s": o.stops,
                 "k": o.carrier,
-                "l": o.link,
+                "l": affiliate(o.link, marker),
                 **({"n": 1} if trip == "ar" and (o.window.id, o.city) in alerted else {}),
             }
             for o in sorted(best.values(), key=lambda o: (index[o.window.id], o.price))
@@ -288,7 +324,8 @@ def main() -> None:
     site_path.parent.mkdir(parents=True, exist_ok=True)
     site_path.write_text(json.dumps(site_data(cfg, wins, trips, deals, geo), ensure_ascii=False, separators=(",", ":")))
 
-    message = format_message(deals, geo, cfg["origin_label"]) if deals else None
+    message = (format_message(deals, geo, cfg["origin_label"], cfg.get("affiliate", {}).get("marker"))
+               if deals else None)
     if args.dry_run:
         print(message or "Nessun affare oggi.")
         return

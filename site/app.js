@@ -46,6 +46,16 @@ function matches(f) {
 
 /* ---------- render: periods ---------- */
 
+function hotelLink(f, name, country) {
+  if (state.trip === "ritorno") return "";
+  const checkin = f.d.slice(0, 10);
+  const checkout = (f.b || data.windows[f.w].end).slice(0, 10);
+  if (checkout <= checkin) return "";
+  const url = `https://www.booking.com/searchresults.it.html?ss=${encodeURIComponent(country ? `${name}, ${country}` : name)}`
+    + `&checkin=${checkin}&checkout=${checkout}&group_adults=1&group_children=0&no_rooms=1`;
+  return `<a class="hotel" href="${esc(url)}" target="_blank" rel="noopener sponsored">Hotel a ${esc(name)}</a>`;
+}
+
 function fareRow(f, i) {
   const [name, country] = data.places[f.c] || [f.c, ""];
   const stops = f.s < 0 ? "scali da verificare" : f.s === 0 ? "diretto" : f.s === 1 ? "1 scalo" : `${f.s} scali`;
@@ -57,10 +67,10 @@ function fareRow(f, i) {
          <b>−${off(f)}%</b><small>${f.n ? "nuovo" : "anomalo"}</small></span>`
     : "";
   const book = f.l
-    ? `<a class="book" href="${esc(f.l)}" target="_blank" rel="noopener" aria-label="Prenota ${esc(name)}, ${eur.format(f.p)}">Prenota<svg aria-hidden="true"><use href="#i-arrow"/></svg></a>`
+    ? `<a class="book" href="${esc(f.l)}" target="_blank" rel="noopener sponsored" aria-label="Prenota ${esc(name)}, ${eur.format(f.p)}">Prenota<svg aria-hidden="true"><use href="#i-arrow"/></svg></a>`
     : "";
   return `<li class="${cls}">
-    <div class="place"><span class="place-name">${esc(name)}</span><span class="place-country">${esc(country)}</span></div>
+    <div class="place"><span class="place-name">${esc(name)}</span><span class="place-country">${esc(country)}</span>${hotelLink(f, name, country)}</div>
     <div class="trip"><span class="route">${esc(f.o)}–${esc(f.a)}</span> · ${stops} · ${esc(f.k)}<br>
       <span class="when">${f.b ? `${fmtWhen(f.d)} → ${fmtWhen(f.b)}` : fmtWhen(f.d)}${unknown}</span></div>
     <div class="price"><b>${eur.format(f.p)}</b>${typical}</div>
@@ -175,8 +185,9 @@ function renderMeta() {
   ].join(" · ");
 
   $("#colophon").innerHTML = `
-    <p>Prezzi per 1 adulto da ${esc(data.origin)}, il più basso per ogni meta e periodo. <b>Andata e ritorno</b>: si parte la sera prima o il primo giorno libero e si rientra l'ultimo giorno. <b>Solo andata</b> e <b>solo ritorno</b> mostrano il singolo volo, con gli stessi orari. Lufthansa e Iberia danno solo il giorno, non l'orario: controllalo prima di prenotare. I prezzi possono cambiare al momento della prenotazione.</p>
-    <p>Un prezzo è <b>anomalo</b> se costa almeno il ${Math.round(data.rules.discount * 100)}% in meno del prezzo tipico di quella meta e fa risparmiare almeno ${eur.format(data.rules.min_saving_eur)}. Il prezzo tipico è la mediana delle tariffe degli ultimi 90 giorni, separata per andata e ritorno, solo andata e solo ritorno. <b>Nuovo</b> vuol dire segnalato su Telegram nell'ultima ricerca (solo per andata e ritorno).</p>`;
+    <p>Prezzi per 1 adulto da ${esc(data.origin)}, il più basso per ogni meta e periodo. <b>Andata e ritorno</b>: si parte la sera prima o il primo giorno libero e si rientra l'ultimo giorno. <b>Solo andata</b> e <b>solo ritorno</b> mostrano il singolo volo, con gli stessi orari. Per alcune compagnie si conosce solo il giorno, non l'orario: controllalo prima di prenotare. I prezzi possono cambiare al momento della prenotazione.</p>
+    <p>Un prezzo è <b>anomalo</b> se costa almeno il ${Math.round(data.rules.discount * 100)}% in meno del prezzo tipico di quella meta e fa risparmiare almeno ${eur.format(data.rules.min_saving_eur)}. Il prezzo tipico è la mediana delle tariffe degli ultimi 90 giorni, separata per andata e ritorno, solo andata e solo ritorno. <b>Nuovo</b> vuol dire segnalato su Telegram nell'ultima ricerca (solo per andata e ritorno).</p>
+    <p>Alcuni link sono di affiliazione (Aviasales, Booking.com e i codici sconto): se prenoti da lì il sito riceve una piccola commissione, senza costi in più per te. La pagina mostra anche annunci di Google.</p>`;
 }
 
 function syncControls() {
