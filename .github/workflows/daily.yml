@@ -2,7 +2,7 @@ name: Voli economici
 
 on:
   schedule:
-    - cron: "0 6,12,18 * * *" # 8:00, 14:00 e 20:00 ora italiana (7:00, 13:00 e 19:00 d'inverno)
+    - cron: "7 */2 * * *" # ogni due ore, al minuto 07 (UTC)
   workflow_dispatch:
   push:
     branches: [main]

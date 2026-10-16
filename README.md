@@ -1,6 +1,6 @@
 # Voli economici da Roma per weekend e ponti
 
-Tre volte al giorno (alle 8, alle 14 e alle 20) controlla **tutti i weekend e i ponti dei prossimi 12 mesi**, cerca i voli da Roma (FCO + CIA) verso qualsiasi destinazione, **andata e ritorno, solo andata e solo ritorno**, e:
+Ogni due ore controlla **tutti i weekend e i ponti dei prossimi 12 mesi**, cerca i voli da Roma (FCO + CIA) verso qualsiasi destinazione, **andata e ritorno, solo andata e solo ritorno**, e:
 
 - ti manda su **Telegram** i nuovi voli andata e ritorno con un **prezzo anomalo** (almeno il 50% sotto il prezzo tipico di quella meta);
 - pubblica una **pagina web** su Render con tutte le tariffe dell'ultima ricerca, comoda anche da telefono.
@@ -36,7 +36,7 @@ La pagina mostra solo i dati dell'ultima ricerca e i periodi futuri. Lo storico 
 
 ## Pubblicazione (una sola volta)
 
-La ricerca gira tre volte al giorno su **GitHub Actions** (gratis), che salva lo storico e pubblica la pagina sul branch `render`. Un **sito statico Render** (gratis) serve quel branch e si aggiorna da solo a ogni pubblicazione.
+La ricerca gira ogni due ore su **GitHub Actions** (gratis), che salva lo storico e pubblica la pagina sul branch `render`. Un **sito statico Render** (gratis) serve quel branch e si aggiorna da solo a ogni pubblicazione.
 
 1. **Repository**: crea un repository su GitHub (anche privato) e carica questa cartella:
    ```sh
@@ -59,7 +59,7 @@ Senza i secret Telegram il workflow funziona lo stesso: aggiorna solo la pagina.
 
 | Quando | Cosa fa |
 |---|---|
-| Ogni giorno alle 8:00, 14:00 e 20:00 (un'ora prima d'inverno) o con *Run workflow* | Cerca i voli (40-60 minuti, per via di Wizz Air, Vueling e Lufthansa), invia Telegram, salva lo storico, pubblica la pagina sul branch `render` |
+| Ogni due ore, al minuto :07 (UTC), o con *Run workflow* | Cerca i voli (40-60 minuti, per via di Wizz Air, Vueling e Lufthansa), invia Telegram, salva lo storico, pubblica la pagina sul branch `render` |
 | Push su `main` che cambia `site/` o il workflow | Ripubblica solo la pagina, riusando i dati già online (nessuna ricerca, nessun messaggio) |
 
 Il branch `render` contiene solo l'ultima versione della pagina (viene sovrascritto ogni volta), quindi la sua storia non cresce.
