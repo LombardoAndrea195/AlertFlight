@@ -6,7 +6,7 @@ ryanair_airports = ["FCO", "CIA"]
 # Periodi: tutti i weekend e i ponti entro questo orizzonte
 horizon_days = 365
 holiday_subdiv = "RM"               # aggiunge Santi Pietro e Paolo (29 giugno)
-max_bridge_days = 1                 # giorni di ferie per fare il ponte (festa di giovedì → prendi venerdì)
+max_bridge_days = 3                 # alternative fino a 3 ferie; la pagina ordina per convenienza
 depart_day_before = true            # parti anche la sera prima (es. venerdì)
 
 delay_seconds = 0.3                 # pausa tra le richieste
@@ -84,9 +84,10 @@ horizon_days = 365
 delay_seconds = 0.3
 
 [times]                             # per escludere viaggi inutili o che richiedono ferie
-day_before_from = "17:00"           # la sera prima: partenza dopo le 17
+day_before_from = "18:00"           # la sera prima: partenza dal venerdì dopo le 18
 first_day_until = "14:00"           # il primo giorno libero: partenza entro le 14
 return_from = "12:00"               # l'ultimo giorno: rientro dopo le 12
+return_until = "23:00"              # rientro entro le 23 dell'ultimo giorno libero
 
 [deals]
 discount = 0.5                      # avvisa se costa almeno la metà del prezzo tipico

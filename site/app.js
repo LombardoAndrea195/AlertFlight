@@ -22,7 +22,7 @@ function rangeTitle(w) {
 }
 
 let data;
-let state = { view: "periodi", trip: "ar", q: "", onlyDeals: false, onlyLong: false, onlyDirect: false, budget: null };
+let state = { view: "periodi", trip: "ar", q: "", onlyDeals: true, onlyWinning: false, onlyDirect: false, availability: "weekends", maxLeave: 1, minDays: 2, budget: null, filterVersion: 2 };
 const expanded = new Set();
 const TRIPS = { ar: "fares", andata: "andata", ritorno: "ritorno" };
 const tripFares = () => data[TRIPS[state.trip] ?? "fares"] ?? [];
@@ -30,11 +30,49 @@ const tripFares = () => data[TRIPS[state.trip] ?? "fares"] ?? [];
 const isDeal = (f) => f.r != null && f.p <= f.r * (1 - data.rules.discount) && f.r - f.p >= data.rules.min_saving_eur;
 const off = (f) => Math.round((1 - f.p / f.r) * 100);
 const rot = (f) => ((f.w * 7 + f.c.charCodeAt(0) * 13 + f.c.charCodeAt(1)) % 11) - 6;
+const windowDays = (w) => daysBetween(w.start, w.end) + 1;
+const convenience = (w) => windowDays(w) / (w.leave || 0.5);
+const nights = (f) => f.b ? daysBetween(f.d, f.b) : null;
+const nightsLabel = (f) => {
+  const n = nights(f);
+  return n == null ? "durata da verificare" : `${n} ${n === 1 ? "notte" : "notti"}`;
+};
+
+function localISO(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function dayStrip(w) {
+  const leave = new Set(w.leaveDays || []);
+  const cells = [];
+  for (let d = day(w.start), end = day(w.end); d <= end; d.setDate(d.getDate() + 1)) {
+    const iso = localISO(d);
+    const weekend = d.getDay() === 0 || d.getDay() === 6;
+    const kind = leave.has(iso) ? "leave" : weekend ? "weekend" : "holiday";
+    const label = kind === "leave" ? "ferie" : kind === "weekend" ? "weekend" : "festa";
+    cells.push(`<li class="day-cell is-${kind}"><b>${DOW[d.getDay()]}</b><time datetime="${iso}">${d.getDate()}</time><small>${label}</small></li>`);
+  }
+  return `<ol class="day-strip" aria-label="Calendario del viaggio">${cells.join("")}</ol>`;
+}
+
+function isWinningWindow(wi) {
+  const w = data.windows[wi];
+  const days = windowDays(w);
+  return !data.windows.some((other, oi) => oi !== wi
+    && day(other.start) <= day(w.end) && day(other.end) >= day(w.start)
+    && other.leave <= w.leave && windowDays(other) >= days
+    && (other.leave < w.leave || windowDays(other) > days));
+}
 
 function matches(f) {
   if (state.onlyDirect && f.s !== 0) return false;
   if (state.budget != null && f.p > state.budget) return false;
-  if (state.onlyLong && data.windows[f.w].kind === "weekend") return false;
+  const w = data.windows[f.w];
+  if (state.availability === "weekends" && w.kind !== "weekend") return false;
+  if (state.availability === "natural" && w.leave !== 0) return false;
+  if (state.availability === "leave" && w.leave > state.maxLeave) return false;
+  if (windowDays(w) < state.minDays) return false;
+  if (state.onlyWinning && !isWinningWindow(f.w)) return false;
   if (state.onlyDeals && !f.deal) return false;
   if (state.q) {
     const [name, country] = data.places[f.c] || [f.c, ""];
@@ -60,6 +98,9 @@ function fareRow(f, i) {
   const [name, country] = data.places[f.c] || [f.c, ""];
   const stops = f.s < 0 ? "scali da verificare" : f.s === 0 ? "diretto" : f.s === 1 ? "1 scalo" : `${f.s} scali`;
   const unknown = f.d.length > 10 ? "" : " · orario da verificare";
+  const depart = day(f.d);
+  const fridayEvening = f.d.length > 10 && depart.getDay() === 5 && f.d.slice(11, 16) >= "18:00";
+  const fridayNote = fridayEvening ? `<span class="trip-note">Partenza venerdì sera</span>` : "";
   const cls = ["fare", f.deal && "is-deal", f.deal && f.n && "is-new"].filter(Boolean).join(" ");
   const typical = f.r != null ? `<small>tipico ${eur.format(f.r)}</small>` : "";
   const stamp = f.deal
@@ -71,7 +112,7 @@ function fareRow(f, i) {
     : "";
   return `<li class="${cls}">
     <div class="place"><span class="place-name">${esc(name)}</span><span class="place-country">${esc(country)}</span>${hotelLink(f, name, country)}</div>
-    <div class="trip"><span class="route">${esc(f.o)}–${esc(f.a)}</span> · ${stops} · ${esc(f.k)}<br>
+    <div class="trip"><span class="trip-duration">${nightsLabel(f)}</span><span class="route">${esc(f.o)}–${esc(f.a)}</span> · ${stops} · ${esc(f.k)}${fridayNote}<br>
       <span class="when">${f.b ? `${fmtWhen(f.d)} → ${fmtWhen(f.b)}` : fmtWhen(f.d)}${unknown}</span></div>
     <div class="price"><b>${eur.format(f.p)}</b>${typical}</div>
     <div class="stamp-cell">${stamp}</div>
@@ -83,20 +124,30 @@ function renderPeriods(fares) {
   const byWindow = new Map();
   for (const f of fares) (byWindow.get(f.w) || byWindow.set(f.w, []).get(f.w)).push(f);
   let stampIndex = 0;
-  const html = [...byWindow.entries()].map(([wi, list]) => {
+  const html = [...byWindow.entries()].sort(([a], [b]) => {
+    const aw = data.windows[a], bw = data.windows[b];
+    return convenience(bw) - convenience(aw) || windowDays(bw) - windowDays(aw) || aw.start.localeCompare(bw.start);
+  }).map(([wi, list]) => {
     const w = data.windows[wi];
     const deals = list.filter((f) => f.deal);
     const open = expanded.has(wi);
     const shown = open ? list : list.filter((f, i) => i < PREVIEW || f.deal);
     const hidden = list.length - shown.length;
-    const days = daysBetween(w.start, w.end) + 1;
+    const days = windowDays(w);
+    const durations = [...new Set(list.map(nights).filter((n) => n != null))].sort((a, b) => a - b);
+    const duration = durations.length === 1
+      ? `${durations[0]} ${durations[0] === 1 ? "notte" : "notti"}`
+      : durations.length ? `${durations[0]}–${durations.at(-1)} notti` : "durata da verificare";
+    const leave = w.leave ? `${w.leave} ${w.leave === 1 ? "giorno di ferie" : "giorni di ferie"}` : "nessun giorno di ferie";
     const label = w.kind === "weekend" ? "" : ` · <span class="kind-${w.kind}">${KIND[w.kind]} · ${esc(w.label)}</span>`;
     return `<section class="page" aria-labelledby="w${wi}">
       <header class="page-head">
         <h2 class="page-title" id="w${wi}">${rangeTitle(w)}</h2>
-        <p class="page-sub">${fmtDay(w.start)} → ${fmtDay(w.end)} · ${days} giorni liberi${label}</p>
+        <p class="page-sub">${fmtDay(w.start)} → ${fmtDay(w.end)}${label}</p>
+        <p class="page-summary"><b>${duration}</b> · ${days} giorni per viaggiare · ${leave}${isWinningWindow(wi) ? " · combinazione vincente" : ""}</p>
         <p class="page-best">da<b>${eur.format(list[0].p)}</b>${deals.length ? `${deals.length} ${deals.length === 1 ? "anomalo" : "anomali"}` : `${list.length} mete`}</p>
       </header>
+      ${dayStrip(w)}
       <ol class="fares">${shown.map((f) => fareRow(f, f.deal ? stampIndex++ : 0)).join("")}</ol>
       ${hidden > 0 ? `<button class="more" type="button" data-expand="${wi}">Mostra altre ${hidden} mete</button>` : ""}
       ${open && list.length > PREVIEW ? `<button class="more" type="button" data-collapse="${wi}">Mostra meno</button>` : ""}
@@ -107,9 +158,10 @@ function renderPeriods(fares) {
 
 /* ---------- render: destinations ---------- */
 
-function monthHeader() {
+function monthHeader(windowIndexes) {
   const spans = [];
-  data.windows.forEach((w) => {
+  windowIndexes.forEach((wi) => {
+    const w = data.windows[wi];
     const m = day(w.start).getMonth();
     const last = spans.at(-1);
     if (last && last.m === m) last.n++;
@@ -119,6 +171,7 @@ function monthHeader() {
 }
 
 function renderDestinations(fares) {
+  const windowIndexes = [...new Set(fares.map((f) => f.w))].sort((a, b) => a - b);
   const byCity = new Map();
   for (const f of fares) (byCity.get(f.c) || byCity.set(f.c, []).get(f.c)).push(f);
   const rows = [...byCity.entries()].map(([c, list]) => {
@@ -128,12 +181,13 @@ function renderDestinations(fares) {
   });
   rows.sort((a, b) => b.bestOff - a.bestOff || a.best.p - b.best.p);
 
-  const n = data.windows.length;
+  const n = windowIndexes.length;
   const body = rows.map(({ c, list, best }) => {
     const [name, country] = data.places[c] || [c, ""];
     const byW = new Map(list.map((f) => [f.w, f]));
     const max = Math.max(...list.map((f) => f.p));
-    const cells = data.windows.map((w, wi) => {
+    const cells = windowIndexes.map((wi) => {
+      const w = data.windows[wi];
       const f = byW.get(wi);
       if (!f) return `<span class="cell is-empty"></span>`;
       const cls = ["cell", f.deal && "is-deal", f.deal && f.n && "is-new", w.kind !== "weekend" && "is-kind"].filter(Boolean).join(" ");
@@ -151,7 +205,7 @@ function renderDestinations(fares) {
   return `<p class="legend"><span><i></i>prezzo per periodo, più alta = più cara</span>
       <span><i class="l-deal"></i>anomalo</span><span><i class="l-new"></i>anomalo, nuovo</span>
       <span><i class="l-kind"></i>ponte o festa</span><span>Tocca una barra per prenotare</span></p>
-    <div class="dest-head"><span>Meta</span><span>Minimo</span><div class="months" style="--n:${n}">${monthHeader()}</div></div>
+    <div class="dest-head"><span>Meta</span><span>Minimo</span><div class="months" style="--n:${n}">${monthHeader(windowIndexes)}</div></div>
     <ol class="fares dests">${body.join("")}</ol>`;
 }
 
@@ -161,9 +215,12 @@ function render() {
   const main = $("#main");
   const fares = tripFares().filter(matches);
   if (!fares.length) {
+    const hint = state.onlyDeals
+      ? "Non ci sono prezzi abbastanza sotto il valore tipico per questi criteri. Disattiva “Solo prezzi anomali” per vedere anche le tariffe normali."
+      : "Prova ad alzare il budget o a togliere qualche filtro.";
     main.innerHTML = `<div class="state"><h2>Nessuna tariffa con questi filtri</h2>
-      <p>Prova ad alzare il budget o a togliere qualche filtro.</p>
-      <button type="button" data-reset>Azzera i filtri</button></div>`;
+       <p>${hint}</p>
+       <button type="button" data-reset>Azzera i filtri</button></div>`;
   } else {
     main.innerHTML = state.view === "mete" ? renderDestinations(fares) : renderPeriods(fares);
   }
@@ -174,19 +231,20 @@ function renderMeta() {
   const g = new Date(data.generated);
   const age = Math.floor((Date.now() - g) / 864e5);
   const list = tripFares();
+  const visiblePeriods = new Set(list.filter(matches).map((f) => f.w)).size;
   const deals = list.filter((f) => f.deal).length;
   const fresh = new Set(list.filter((f) => f.n).map((f) => `${f.w}|${f.c}`)).size;
   const when = `${DOW[g.getDay()]} ${g.getDate()} ${MON[g.getMonth()]}, ${g.toTimeString().slice(0, 5)}`;
   $("#meta").innerHTML = [
     age >= 2 ? `<span class="stale">Dati di ${age} giorni fa</span>` : `Aggiornato ${when}`,
-    `<b>${data.windows.length}</b> periodi`,
+    `<b>${visiblePeriods}</b> periodi`,
     `<b>${int.format(list.length)}</b> tariffe`,
     `<b>${deals}</b> anomali${fresh ? `, <b>${fresh}</b> nuovi` : ""}`,
   ].join(" · ");
 
   $("#colophon").innerHTML = `
-    <p>Prezzi per 1 adulto da ${esc(data.origin)}, il più basso per ogni meta e periodo. <b>Andata e ritorno</b>: si parte la sera prima o il primo giorno libero e si rientra l'ultimo giorno. <b>Solo andata</b> e <b>solo ritorno</b> mostrano il singolo volo, con gli stessi orari. Per alcune compagnie si conosce solo il giorno, non l'orario: controllalo prima di prenotare. I prezzi possono cambiare al momento della prenotazione.</p>
-    <p>Un prezzo è <b>anomalo</b> se costa almeno il ${Math.round(data.rules.discount * 100)}% in meno del prezzo tipico di quella meta e fa risparmiare almeno ${eur.format(data.rules.min_saving_eur)}. Il prezzo tipico è la mediana delle tariffe degli ultimi 90 giorni, separata per andata e ritorno, solo andata e solo ritorno. <b>Nuovo</b> vuol dire segnalato su Telegram nell'ultima ricerca (solo per andata e ritorno).</p>
+    <p>Prezzi per 1 adulto da ${esc(data.origin)}, il più basso per ogni meta e periodo. La ricerca parte dai <b>weekend</b>: quando disponibile, la partenza del venerdì è dopo le 18 e il rientro dell'ultimo giorno è fra le 12 e le 23. Con <b>Aggiungi ferie</b> estendi la ricerca ai ponti prima o dopo un weekend o una festa. <b>Solo andata</b> e <b>solo ritorno</b> mostrano il singolo volo, con gli stessi orari. Per alcune compagnie si conosce solo il giorno, non l'orario: controllalo prima di prenotare. I prezzi possono cambiare al momento della prenotazione.</p>
+    <p>Un prezzo è <b>anomalo</b> se costa almeno il ${Math.round(data.rules.discount * 100)}% in meno del prezzo tipico dello stesso viaggio e fa risparmiare almeno ${eur.format(data.rules.min_saving_eur)}. Il prezzo tipico è la mediana delle tariffe degli ultimi 90 giorni, per la stessa meta e le stesse date di partenza e ritorno, separata per andata e ritorno, solo andata e solo ritorno. <b>Nuovo</b> vuol dire segnalato su Telegram nell'ultima ricerca (solo per andata e ritorno).</p>
     <p>Alcuni link sono di affiliazione (Aviasales, Booking.com e i codici sconto): se prenoti da lì il sito riceve una piccola commissione, senza costi in più per te. La pagina mostra anche annunci di Google.</p>`;
 }
 
@@ -194,7 +252,11 @@ function syncControls() {
   for (const b of document.querySelectorAll("[data-view]")) b.setAttribute("aria-selected", String(b.dataset.view === state.view));
   for (const r of document.querySelectorAll('input[name="trip"]')) r.checked = r.value === state.trip;
   $("#q").value = state.q;
-  for (const id of ["onlyDeals", "onlyLong", "onlyDirect"]) $(`#${id}`).checked = state[id];
+  for (const id of ["onlyDeals", "onlyWinning", "onlyDirect"]) $(`#${id}`).checked = state[id];
+  $("#availability").value = state.availability;
+  $("#maxLeave").value = String(state.maxLeave);
+  $("#leaveFilter").hidden = state.availability !== "leave";
+  $("#minDays").value = String(state.minDays);
   const range = $("#budget");
   range.value = state.budget ?? range.max;
   $("#budgetOut").textContent = state.budget == null ? "qualsiasi prezzo" : eur.format(state.budget);
@@ -204,7 +266,7 @@ function update(patch) {
   Object.assign(state, patch);
   localStorage.setItem(STORE, JSON.stringify(state));
   syncControls();
-  if ("trip" in patch) { expanded.clear(); renderMeta(); }
+  if ("trip" in patch || "availability" in patch || "maxLeave" in patch || "minDays" in patch) { expanded.clear(); renderMeta(); }
   render();
 }
 
@@ -217,7 +279,9 @@ function bind() {
   for (const r of document.querySelectorAll('input[name="trip"]')) r.addEventListener("change", () => update({ trip: r.value }));
   let t;
   $("#q").addEventListener("input", (e) => { clearTimeout(t); t = setTimeout(() => update({ q: e.target.value.trim() }), 120); });
-  for (const id of ["onlyDeals", "onlyLong", "onlyDirect"]) $(`#${id}`).addEventListener("change", (e) => update({ [id]: e.target.checked }));
+  for (const id of ["onlyDeals", "onlyWinning", "onlyDirect"]) $(`#${id}`).addEventListener("change", (e) => update({ [id]: e.target.checked }));
+  $("#availability").addEventListener("change", (e) => update({ availability: e.target.value }));
+  for (const id of ["maxLeave", "minDays"]) $(`#${id}`).addEventListener("change", (e) => update({ [id]: Number(e.target.value) }));
   const range = $("#budget");
   range.addEventListener("input", () => {
     const v = Number(range.value);
@@ -228,7 +292,7 @@ function bind() {
   $("#main").addEventListener("click", (e) => {
     const t = e.target.closest("[data-expand],[data-collapse],[data-reset]");
     if (!t) return;
-    if (t.dataset.reset != null) return update({ q: "", onlyDeals: false, onlyLong: false, onlyDirect: false, budget: null });
+    if (t.dataset.reset != null) return update({ q: "", onlyDeals: true, onlyWinning: false, onlyDirect: false, availability: "weekends", maxLeave: 1, minDays: 2, budget: null, filterVersion: 2 });
     const wi = Number(t.dataset.expand ?? t.dataset.collapse);
     t.dataset.expand != null ? expanded.add(wi) : expanded.delete(wi);
     render();
@@ -304,6 +368,11 @@ async function start() {
   try {
     Object.assign(state, JSON.parse(localStorage.getItem(STORE) || "{}"));
   } catch { /* corrupted preferences: keep defaults */ }
+  if (state.filterVersion !== 2) {
+    state.onlyDeals = true;
+    state.filterVersion = 2;
+    localStorage.setItem(STORE, JSON.stringify(state));
+  }
 
   try {
     const res = await fetch("data.json", { cache: "no-cache" });
@@ -322,8 +391,19 @@ async function start() {
   }
 
   if (!(state.trip in TRIPS)) state.trip = "ar";
+  if (!(["weekends", "natural", "leave"].includes(state.availability))) state.availability = "weekends";
+  if (!("maxLeave" in state)) state.maxLeave = 1;
+  state.maxLeave = Math.min(Math.max(Number(state.maxLeave) || 1, 1), data.periodRules?.maxLeave ?? 3);
+  if (!("minDays" in state)) state.minDays = 2;
   const all = Object.values(TRIPS).flatMap((k) => data[k] ?? []);
   for (const f of all) f.deal = isDeal(f);
+  // Old or first-run data has no historical references yet.  In that case an
+  // anomaly-only default would hide every result, which is less useful than
+  // showing the available fares while the baseline is being built.
+  if (state.onlyDeals && !all.some((f) => f.r != null)) {
+    state.onlyDeals = false;
+    localStorage.setItem(STORE, JSON.stringify(state));
+  }
   const maxPrice = Math.ceil(Math.max(...all.map((f) => f.p)) / 10) * 10;
   $("#budget").max = String(Math.max(maxPrice, 30));
   if (state.budget != null && state.budget >= maxPrice) state.budget = null;

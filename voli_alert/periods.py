@@ -16,56 +16,64 @@ class Window:
     start: date  # first day off
     end: date  # last day off
     label: str
+    leave_days: tuple[date, ...] = ()
 
     @property
     def id(self) -> str:
         return f"{self.start}_{self.end}"
 
     def outbound_dates(self, depart_day_before: bool) -> list[date]:
-        return ([self.start - timedelta(days=1)] if depart_day_before else []) + [self.start]
+        """Use the evening before a normal break, otherwise its first free day.
+
+        A plain Saturday–Sunday window therefore has the requested Friday-evening
+        departure.  If taking leave makes Thursday the first free day, querying
+        Thursday is more useful than leaving on Wednesday evening.
+        """
+        if depart_day_before and self.start not in self.leave_days:
+            return [self.start - timedelta(days=1)]
+        return [self.start]
 
     def describe(self) -> str:
         return f"{self.label} · {fmt_day(self.start)} – {fmt_day(self.end)}"
 
 
 def windows(today: date, horizon_days: int, max_bridge_days: int, subdiv: str | None) -> list[Window]:
-    """Weekends and long weekends (holidays + bridge days) starting within the horizon."""
+    """Every useful continuous break that needs at most ``max_bridge_days`` leave days.
+
+    We enumerate short date ranges instead of only joining pre-existing days off.
+    This preserves plain weekends and also finds the useful extensions on either
+    side: for example, a Thursday holiday plus Friday leave, or a Monday leave
+    after a weekend.  The leave-day cap makes the scan bounded and cheap.
+    """
     first, last = today + timedelta(days=1), today + timedelta(days=horizon_days + 7)
     days = [first + timedelta(days=i) for i in range((last - first).days + 1)]
     hol = holidays.Italy(subdiv=subdiv, years=range(first.year, last.year + 1))
 
-    off = {d: d.weekday() >= 5 or d in hol for d in days}
-    bridged: set[date] = set()
+    naturally_off = {d: d.weekday() >= 5 or d in hol for d in days}
+    result: dict[tuple[date, date], Window] = {}
 
-    i = 0
-    while i < len(days):
-        if off[days[i]]:
-            i += 1
-            continue
-        j = i
-        while j < len(days) and not off[days[j]]:
-            j += 1
-        if 0 < i and j < len(days) and j - i <= max_bridge_days:
-            bridged.update(days[i:j])
-        i = j
-    for d in bridged:
-        off[d] = True
-
-    result = []
-    i = 0
-    while i < len(days):
-        if not off[days[i]]:
-            i += 1
-            continue
-        j = i
-        while j < len(days) and off[days[j]]:
-            j += 1
-        block = days[i:j]
-        if len(block) >= 2 and block[0] <= today + timedelta(days=horizon_days):
+    for start_i, start in enumerate(days):
+        leave: list[date] = []
+        naturally_off_days = 0
+        for end in days[start_i:]:
+            if naturally_off[end]:
+                naturally_off_days += 1
+            else:
+                leave.append(end)
+            if len(leave) > max_bridge_days:
+                break
+            if start > today + timedelta(days=horizon_days):
+                continue
+            # A single holiday plus a leave day is not a useful break on its
+            # own.  At least two naturally free days keeps the search focused
+            # on weekends, holidays joined to them, and genuine bridges.
+            if end - start < timedelta(days=1) or naturally_off_days < 2:
+                continue
+            block = [d for d in days if start <= d <= end]
             names = list(dict.fromkeys(hol[d].replace("; ", " / ") for d in block if d in hol))
             label = " + ".join(names) if names else "Weekend"
-            if any(d in bridged for d in block):
+            if leave:
                 label = f"Ponte {label}"
-            result.append(Window(block[0], block[-1], label))
-        i = j
-    return result
+            result[(start, end)] = Window(start, end, label, tuple(leave))
+
+    return sorted(result.values(), key=lambda w: (w.start, w.end, len(w.leave_days)))

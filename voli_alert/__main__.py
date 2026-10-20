@@ -27,9 +27,10 @@ def times_ok(o: sources.Offer, t: dict) -> bool:
     if not has_time(o.depart):  # the source only knows the dates, already chosen to fit the window
         return True
     if o.trip == "ritorno":
-        return o.depart[11:16] >= t["return_from"]
+        return t["return_from"] <= o.depart[11:16] <= t["return_until"]
     lo, hi = out_times(date.fromisoformat(o.depart[:10]), o.window, t)
-    return lo <= o.depart[11:16] <= hi and (o.trip == "andata" or o.ret[11:16] >= t["return_from"])
+    return (lo <= o.depart[11:16] <= hi
+            and (o.trip == "andata" or t["return_from"] <= o.ret[11:16] <= t["return_until"]))
 
 
 def has_time(iso: str) -> bool:
@@ -248,7 +249,7 @@ def _post(token: str, chat: str, text: str) -> None:
 
 
 def site_data(cfg, wins, trips: dict, deals, geo: sources.Geo) -> dict:
-    """Everything the web page shows, as compact JSON. `trips` maps trip type to (best offers, typical prices)."""
+    """Everything the web page shows, as compact JSON."""
     index = {w.id: i for i, w in enumerate(wins)}
     alerted = {(d.offer.window.id, d.offer.city) for d in deals}
     cities = {o.city for best, _ in trips.values() for o in best.values()}
@@ -278,12 +279,15 @@ def site_data(cfg, wins, trips: dict, deals, geo: sources.Geo) -> dict:
         "generated": datetime.now().astimezone().isoformat(timespec="minutes"),
         "origin": cfg["origin_label"],
         "rules": {k: cfg["deals"][k] for k in ("discount", "min_saving_eur")},
+        "periodRules": {"maxLeave": cfg["max_bridge_days"]},
         "windows": [
             {
                 "start": w.start.isoformat(),
                 "end": w.end.isoformat(),
                 "label": w.label.removeprefix("Ponte "),
                 "kind": "weekend" if w.label == "Weekend" else "ponte" if w.label.startswith("Ponte ") else "festivo",
+                "leave": len(w.leave_days),
+                "leaveDays": [d.isoformat() for d in w.leave_days],
             }
             for w in wins
         ],

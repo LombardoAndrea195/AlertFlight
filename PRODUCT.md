@@ -30,7 +30,7 @@ Unlike Google Flights or Skyscanner "Everywhere", it is organised around the own
 
 ## Capabilities and Constraints
 
-- Periods: weekends + holidays from `holidays` (IT, subdiv RM); one leave day bridges a Tuesday/Thursday holiday.
+- Periods: weekends + holidays from `holidays` (IT, subdiv RM), plus every viable bridge using up to three leave days. The page ranks periods by free days per day of leave and can show only locally non-dominated combinations.
 - "Anomaly" = at least 50% below the destination's typical price (the median of daily medians over 90 days) and at least €15 saved. Configurable in `config.toml`.
 - Public Render static site; secrets stay in GitHub Actions secrets.
 - Italian UI.

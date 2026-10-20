@@ -27,9 +27,9 @@ def best_per_window_city(offers: list[Offer]) -> dict[tuple[str, str], Offer]:
 def reference_prices(best: dict[tuple[str, str], Offer], state: dict, today: date, cfg: dict) -> dict[str, float]:
     """Typical price per destination, updating the history in state.
 
-    It is the median of daily medians (across all windows) over the lookback period,
-    so it works from the first run and gets steadier every day. Destinations seen in
-    fewer than `min_samples` windows today get no reference.
+    The comparison is the median of each destination's daily median across all
+    searched periods.  This makes a cheap weekend stand out immediately rather
+    than waiting for several observations of the exact same future dates.
     """
     by_city: dict[str, list[float]] = {}
     for o in best.values():
