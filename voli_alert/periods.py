@@ -25,12 +25,13 @@ class Window:
     def outbound_dates(self, depart_day_before: bool) -> list[date]:
         """Use the evening before a normal break, otherwise its first free day.
 
-        A plain Saturday–Sunday window therefore has the requested Friday-evening
-        departure.  If taking leave makes Thursday the first free day, querying
+        A plain Saturday–Sunday window therefore tries the requested
+        Friday-evening departure first, while keeping Saturday as a lower-price
+        fallback.  If taking leave makes Thursday the first free day, querying
         Thursday is more useful than leaving on Wednesday evening.
         """
         if depart_day_before and self.start not in self.leave_days:
-            return [self.start - timedelta(days=1)]
+            return [self.start - timedelta(days=1), self.start]
         return [self.start]
 
     def describe(self) -> str:

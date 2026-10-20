@@ -28,7 +28,7 @@ Ogni due ore controlla **tutti i weekend e i ponti dei prossimi 12 mesi**, cerca
    - **Travelpayouts / Aviasales** (gratis con token): **tutte le compagnie e tutto il mondo, compresi i voli intercontinentali** e con scalo. Dati in cache delle ultime 48 ore.
 
    easyJet e ITA Airways non hanno un'API utilizzabile (easyJet blocca ogni richiesta, ITA mostra solo prezzi per viaggi di 14 giorni): i loro voli arrivano solo da Travelpayouts.
-3. **Orari sensati**: per il weekend si cerca la partenza del venerdì dopo le 18; se il ponte comincia con ferie o una festa, si cerca il primo giorno libero entro le 14. Il rientro dell'ultimo giorno è fra le 12 e le 23. Valgono anche per i voli di sola andata e di solo ritorno. Per Lufthansa e Iberia si conoscono solo le date: la pagina e Telegram scrivono "orario da verificare".
+3. **Orari sensati**: per il weekend la prima scelta è partire il venerdì dopo le 18, senza però escludere il sabato se è sensibilmente più economico. Se il ponte comincia con ferie o una festa, si cerca il primo giorno libero entro le 14. Il rientro dell'ultimo giorno è fra le 12 e le 23. Valgono anche per i voli di sola andata e di solo ritorno. Per Lufthansa e Iberia si conoscono solo le date: la pagina e Telegram scrivono "orario da verificare".
 4. **Prezzo anomalo**: il prezzo tipico di ogni meta è la mediana delle tariffe degli ultimi 90 giorni su tutti i periodi cercati, calcolata a parte per andata e ritorno, solo andata e solo ritorno. È anomalo se costa almeno il 50% in meno e fa risparmiare almeno 15 €.
 5. **Niente doppioni** su Telegram: lo stesso volo viene segnalato di nuovo solo se scende di un altro 10%.
 

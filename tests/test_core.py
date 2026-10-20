@@ -15,7 +15,7 @@ def test_plain_weekend():
         (date(2026, 10, 17), date(2026, 10, 18), "Weekend"),
         (date(2026, 10, 24), date(2026, 10, 25), "Weekend"),
     ]
-    assert ws[0].outbound_dates(True) == [date(2026, 10, 16)]
+    assert ws[0].outbound_dates(True) == [date(2026, 10, 16), date(2026, 10, 17)]
 
 
 def test_leave_days_can_extend_a_weekend_on_both_sides():
@@ -25,7 +25,7 @@ def test_leave_days_can_extend_a_weekend_on_both_sides():
     assert thursday_to_sunday.leave_days == (date(2026, 10, 15), date(2026, 10, 16))
     assert thursday_to_sunday.outbound_dates(True) == [date(2026, 10, 15)]
     assert saturday_to_monday.leave_days == (date(2026, 10, 19),)
-    assert saturday_to_monday.outbound_dates(True) == [date(2026, 10, 16)]
+    assert saturday_to_monday.outbound_dates(True) == [date(2026, 10, 16), date(2026, 10, 17)]
 
 
 def test_tuesday_holiday_becomes_bridge():
