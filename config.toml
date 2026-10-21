@@ -6,7 +6,7 @@ ryanair_airports = ["FCO", "CIA"]
 # Periodi: tutti i weekend e i ponti entro questo orizzonte
 horizon_days = 365
 holiday_subdiv = "RM"               # aggiunge Santi Pietro e Paolo (29 giugno)
-max_bridge_days = 3                 # alternative fino a 3 ferie; la pagina ordina per convenienza
+max_bridge_days = 4                 # alternative fino a 4 ferie, incluso il ponte Natale–Capodanno
 depart_day_before = true            # parti anche la sera prima (es. venerdì)
 
 delay_seconds = 0.3                 # pausa tra le richieste

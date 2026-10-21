@@ -6,6 +6,7 @@ import os
 import time
 import tomllib
 from concurrent.futures import ThreadPoolExecutor
+from collections import Counter
 from datetime import date, datetime
 from pathlib import Path
 
@@ -265,6 +266,7 @@ def site_data(cfg, wins, trips: dict, deals, geo: sources.Geo) -> dict:
                 "r": refs.get(o.city),
                 "d": o.depart[:16],
                 **({"b": o.ret[:16]} if o.ret else {}),
+                **({"nights": (date.fromisoformat(o.ret[:10]) - date.fromisoformat(o.depart[:10])).days} if o.ret else {}),
                 "o": o.origin_airport,
                 "a": o.dest_airport,
                 "s": o.stops,
@@ -275,11 +277,26 @@ def site_data(cfg, wins, trips: dict, deals, geo: sources.Geo) -> dict:
             for o in sorted(best.values(), key=lambda o: (index[o.window.id], o.price))
         ]
 
+    fare_lists = {trip: fares(trip) for trip in ("ar", "andata", "ritorno")}
     return {
+        "schemaVersion": 2,
         "generated": datetime.now().astimezone().isoformat(timespec="minutes"),
         "origin": cfg["origin_label"],
         "rules": {k: cfg["deals"][k] for k in ("discount", "min_saving_eur")},
-        "periodRules": {"maxLeave": cfg["max_bridge_days"]},
+        "periodRules": {
+            "maxLeave": cfg["max_bridge_days"],
+            "horizonDays": cfg["horizon_days"],
+            "holidaySubdivision": cfg.get("holiday_subdiv"),
+            "departureTimes": cfg["times"],
+        },
+        "summary": {
+            "windows": {
+                "total": len(wins),
+                "byKind": dict(Counter("weekend" if w.label == "Weekend" else "ponte" if w.label.startswith("Ponte ") else "festivo" for w in wins)),
+                "byLeaveDays": dict(Counter(str(len(w.leave_days)) for w in wins)),
+            },
+            "fares": {trip: len(items) for trip, items in fare_lists.items()},
+        },
         "windows": [
             {
                 "start": w.start.isoformat(),
@@ -294,9 +311,9 @@ def site_data(cfg, wins, trips: dict, deals, geo: sources.Geo) -> dict:
         "places": {
             c: [geo.city_name.get(c, c), geo.country_name.get(geo.city_country.get(c, ""), "")] for c in sorted(cities)
         },
-        "fares": fares("ar"),
-        "andata": fares("andata"),
-        "ritorno": fares("ritorno"),
+        "fares": fare_lists["ar"],
+        "andata": fare_lists["andata"],
+        "ritorno": fare_lists["ritorno"],
     }
 
 

@@ -22,7 +22,7 @@ function rangeTitle(w) {
 }
 
 let data;
-let state = { view: "periodi", trip: "ar", q: "", onlyDeals: true, onlyWinning: false, onlyDirect: false, availability: "weekends", maxLeave: 1, minDays: 2, budget: null, filterVersion: 2 };
+let state = { view: "periodi", trip: "ar", q: "", onlyDeals: true, onlyDirect: false, availability: "weekends", maxLeave: 0, nights: null, departure: "free", sortBy: "saving", budget: null, filterVersion: 5 };
 const expanded = new Set();
 const TRIPS = { ar: "fares", andata: "andata", ritorno: "ritorno" };
 const tripFares = () => data[TRIPS[state.trip] ?? "fares"] ?? [];
@@ -32,11 +32,26 @@ const off = (f) => Math.round((1 - f.p / f.r) * 100);
 const rot = (f) => ((f.w * 7 + f.c.charCodeAt(0) * 13 + f.c.charCodeAt(1)) % 11) - 6;
 const windowDays = (w) => daysBetween(w.start, w.end) + 1;
 const convenience = (w) => windowDays(w) / (w.leave || 0.5);
-const nights = (f) => f.b ? daysBetween(f.d, f.b) : null;
+const nights = (f) => f.nights ?? (f.b ? daysBetween(f.d, f.b) : null);
 const nightsLabel = (f) => {
   const n = nights(f);
   return n == null ? "durata da verificare" : `${n} ${n === 1 ? "notte" : "notti"}`;
 };
+
+function departureFits(f, w) {
+  if (state.departure === "any") return true;
+  const depart = day(f.d);
+  const start = day(w.start);
+  const departISO = f.d.slice(0, 10);
+  const startsOnFreeDay = depart >= start && !(w.leaveDays || []).includes(departISO);
+  if (startsOnFreeDay) return true;
+  if (depart.getDay() !== 5) return false;
+  if (state.departure === "friday-morning") return depart <= start;
+  return state.departure === "friday-evening"
+    && f.d.length > 10
+    && f.d.slice(11, 16) >= "18:00"
+    && daysBetween(f.d, w.start) === 1;
+}
 
 function localISO(d) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -55,24 +70,14 @@ function dayStrip(w) {
   return `<ol class="day-strip" aria-label="Calendario del viaggio">${cells.join("")}</ol>`;
 }
 
-function isWinningWindow(wi) {
-  const w = data.windows[wi];
-  const days = windowDays(w);
-  return !data.windows.some((other, oi) => oi !== wi
-    && day(other.start) <= day(w.end) && day(other.end) >= day(w.start)
-    && other.leave <= w.leave && windowDays(other) >= days
-    && (other.leave < w.leave || windowDays(other) > days));
-}
-
 function matches(f) {
   if (state.onlyDirect && f.s !== 0) return false;
   if (state.budget != null && f.p > state.budget) return false;
   const w = data.windows[f.w];
   if (state.availability === "weekends" && w.kind !== "weekend") return false;
-  if (state.availability === "natural" && w.leave !== 0) return false;
-  if (state.availability === "leave" && w.leave > state.maxLeave) return false;
-  if (windowDays(w) < state.minDays) return false;
-  if (state.onlyWinning && !isWinningWindow(f.w)) return false;
+  if (state.availability === "holidays" && w.leave > state.maxLeave) return false;
+  if (state.nights != null && nights(f) !== state.nights) return false;
+  if (!departureFits(f, w)) return false;
   if (state.onlyDeals && !f.deal) return false;
   if (state.q) {
     const [name, country] = data.places[f.c] || [f.c, ""];
@@ -144,7 +149,7 @@ function renderPeriods(fares) {
       <header class="page-head">
         <h2 class="page-title" id="w${wi}">${rangeTitle(w)}</h2>
         <p class="page-sub">${fmtDay(w.start)} → ${fmtDay(w.end)}${label}</p>
-        <p class="page-summary"><b>${duration}</b> · ${days} giorni per viaggiare · ${leave}${isWinningWindow(wi) ? " · combinazione vincente" : ""}</p>
+        <p class="page-summary"><b>${duration}</b> · ${days} giorni per viaggiare · ${leave}</p>
         <p class="page-best">da<b>${eur.format(list[0].p)}</b>${deals.length ? `${deals.length} ${deals.length === 1 ? "anomalo" : "anomali"}` : `${list.length} mete`}</p>
       </header>
       ${dayStrip(w)}
@@ -177,9 +182,26 @@ function renderDestinations(fares) {
   const rows = [...byCity.entries()].map(([c, list]) => {
     const best = list.reduce((a, b) => (b.p < a.p ? b : a));
     const bestOff = Math.max(0, ...list.filter((f) => f.deal).map(off));
-    return { c, list, best, bestOff };
+    return {
+      c,
+      list,
+      best,
+      bestOff,
+      minLeave: Math.min(...list.map((f) => data.windows[f.w].leave)),
+      maxNights: Math.max(...list.map((f) => nights(f) ?? -1)),
+      firstDeparture: list.reduce((first, f) => f.d < first ? f.d : first, list[0].d),
+    };
   });
-  rows.sort((a, b) => b.bestOff - a.bestOff || a.best.p - b.best.p);
+  rows.sort((a, b) => {
+    const primary = {
+      price: a.best.p - b.best.p,
+      saving: b.bestOff - a.bestOff,
+      leave: a.minLeave - b.minLeave,
+      nights: b.maxNights - a.maxNights,
+      departure: a.firstDeparture.localeCompare(b.firstDeparture),
+    }[state.sortBy];
+    return primary || a.best.p - b.best.p || a.c.localeCompare(b.c);
+  });
 
   const n = windowIndexes.length;
   const body = rows.map(({ c, list, best }) => {
@@ -243,7 +265,7 @@ function renderMeta() {
   ].join(" · ");
 
   $("#colophon").innerHTML = `
-    <p>Prezzi per 1 adulto da ${esc(data.origin)}, il più basso per ogni meta e periodo. La ricerca parte dai <b>weekend</b>: quando disponibile, la partenza del venerdì è dopo le 18 e il rientro dell'ultimo giorno è fra le 12 e le 23. Con <b>Aggiungi ferie</b> estendi la ricerca ai ponti prima o dopo un weekend o una festa. <b>Solo andata</b> e <b>solo ritorno</b> mostrano il singolo volo, con gli stessi orari. Per alcune compagnie si conosce solo il giorno, non l'orario: controllalo prima di prenotare. I prezzi possono cambiare al momento della prenotazione.</p>
+    <p>Prezzi per 1 adulto da ${esc(data.origin)}, il più basso per ogni meta e periodo. La ricerca parte dai <b>weekend</b>: quando disponibile, la partenza del venerdì è dopo le 18 e il rientro dell'ultimo giorno è fra le 12 e le 23. Con <b>Weekend e feste</b> puoi anche indicare quante ferie sei disposto a usare: con zero ferie mostra solo i giorni già liberi, con più ferie include i ponti continui possibili. Il filtro <b>Notti</b> usa la durata effettiva fra andata e ritorno. Con <b>Partenza</b> indichi se puoi lasciare Roma solo nei giorni già liberi, il venerdì sera, il venerdì mattina o in qualsiasi orario. <b>Solo andata</b> e <b>solo ritorno</b> mostrano il singolo volo, con gli stessi orari. Per alcune compagnie si conosce solo il giorno, non l'orario: controllalo prima di prenotare. I prezzi possono cambiare al momento della prenotazione.</p>
     <p>Un prezzo è <b>anomalo</b> se costa almeno il ${Math.round(data.rules.discount * 100)}% in meno del prezzo tipico dello stesso viaggio e fa risparmiare almeno ${eur.format(data.rules.min_saving_eur)}. Il prezzo tipico è la mediana delle tariffe degli ultimi 90 giorni, per la stessa meta e le stesse date di partenza e ritorno, separata per andata e ritorno, solo andata e solo ritorno. <b>Nuovo</b> vuol dire segnalato su Telegram nell'ultima ricerca (solo per andata e ritorno).</p>
     <p>Alcuni link sono di affiliazione (Aviasales, Booking.com e i codici sconto): se prenoti da lì il sito riceve una piccola commissione, senza costi in più per te. La pagina mostra anche annunci di Google.</p>`;
 }
@@ -252,11 +274,14 @@ function syncControls() {
   for (const b of document.querySelectorAll("[data-view]")) b.setAttribute("aria-selected", String(b.dataset.view === state.view));
   for (const r of document.querySelectorAll('input[name="trip"]')) r.checked = r.value === state.trip;
   $("#q").value = state.q;
-  for (const id of ["onlyDeals", "onlyWinning", "onlyDirect"]) $(`#${id}`).checked = state[id];
+  for (const id of ["onlyDeals", "onlyDirect"]) $(`#${id}`).checked = state[id];
   $("#availability").value = state.availability;
   $("#maxLeave").value = String(state.maxLeave);
-  $("#leaveFilter").hidden = state.availability !== "leave";
-  $("#minDays").value = String(state.minDays);
+  $("#leaveFilter").hidden = state.availability !== "holidays";
+  $("#nights").value = state.nights == null ? "" : String(state.nights);
+  $("#departure").value = state.departure;
+  $("#sortBy").value = state.sortBy;
+  $("#sortFilter").hidden = state.view !== "mete";
   const range = $("#budget");
   range.value = state.budget ?? range.max;
   $("#budgetOut").textContent = state.budget == null ? "qualsiasi prezzo" : eur.format(state.budget);
@@ -266,7 +291,7 @@ function update(patch) {
   Object.assign(state, patch);
   localStorage.setItem(STORE, JSON.stringify(state));
   syncControls();
-  if ("trip" in patch || "availability" in patch || "maxLeave" in patch || "minDays" in patch) { expanded.clear(); renderMeta(); }
+  if ("trip" in patch || "availability" in patch || "maxLeave" in patch || "nights" in patch || "departure" in patch) { expanded.clear(); renderMeta(); }
   render();
 }
 
@@ -279,9 +304,12 @@ function bind() {
   for (const r of document.querySelectorAll('input[name="trip"]')) r.addEventListener("change", () => update({ trip: r.value }));
   let t;
   $("#q").addEventListener("input", (e) => { clearTimeout(t); t = setTimeout(() => update({ q: e.target.value.trim() }), 120); });
-  for (const id of ["onlyDeals", "onlyWinning", "onlyDirect"]) $(`#${id}`).addEventListener("change", (e) => update({ [id]: e.target.checked }));
+  for (const id of ["onlyDeals", "onlyDirect"]) $(`#${id}`).addEventListener("change", (e) => update({ [id]: e.target.checked }));
   $("#availability").addEventListener("change", (e) => update({ availability: e.target.value }));
-  for (const id of ["maxLeave", "minDays"]) $(`#${id}`).addEventListener("change", (e) => update({ [id]: Number(e.target.value) }));
+  $("#maxLeave").addEventListener("change", (e) => update({ maxLeave: Number(e.target.value) }));
+  $("#nights").addEventListener("change", (e) => update({ nights: e.target.value ? Number(e.target.value) : null }));
+  $("#departure").addEventListener("change", (e) => update({ departure: e.target.value }));
+  $("#sortBy").addEventListener("change", (e) => update({ sortBy: e.target.value }));
   const range = $("#budget");
   range.addEventListener("input", () => {
     const v = Number(range.value);
@@ -292,7 +320,7 @@ function bind() {
   $("#main").addEventListener("click", (e) => {
     const t = e.target.closest("[data-expand],[data-collapse],[data-reset]");
     if (!t) return;
-    if (t.dataset.reset != null) return update({ q: "", onlyDeals: true, onlyWinning: false, onlyDirect: false, availability: "weekends", maxLeave: 1, minDays: 2, budget: null, filterVersion: 2 });
+    if (t.dataset.reset != null) return update({ q: "", onlyDeals: true, onlyDirect: false, availability: "weekends", maxLeave: 0, nights: null, departure: "free", sortBy: "saving", budget: null, filterVersion: 5 });
     const wi = Number(t.dataset.expand ?? t.dataset.collapse);
     t.dataset.expand != null ? expanded.add(wi) : expanded.delete(wi);
     render();
@@ -368,9 +396,15 @@ async function start() {
   try {
     Object.assign(state, JSON.parse(localStorage.getItem(STORE) || "{}"));
   } catch { /* corrupted preferences: keep defaults */ }
-  if (state.filterVersion !== 2) {
+  delete state.onlyWinning;
+  if (state.filterVersion !== 5) {
     state.onlyDeals = true;
-    state.filterVersion = 2;
+    state.availability = "weekends";
+    state.maxLeave = 0;
+    state.nights = null;
+    state.departure = "free";
+    state.sortBy = "saving";
+    state.filterVersion = 5;
     localStorage.setItem(STORE, JSON.stringify(state));
   }
 
@@ -391,10 +425,13 @@ async function start() {
   }
 
   if (!(state.trip in TRIPS)) state.trip = "ar";
-  if (!(["weekends", "natural", "leave"].includes(state.availability))) state.availability = "weekends";
-  if (!("maxLeave" in state)) state.maxLeave = 1;
-  state.maxLeave = Math.min(Math.max(Number(state.maxLeave) || 1, 1), data.periodRules?.maxLeave ?? 3);
-  if (!("minDays" in state)) state.minDays = 2;
+  if (!(["weekends", "holidays"].includes(state.availability))) state.availability = "weekends";
+  if (!("maxLeave" in state)) state.maxLeave = 0;
+  state.maxLeave = Math.min(Math.max(Number(state.maxLeave) || 0, 0), data.periodRules?.maxLeave ?? 4);
+  if (state.nights != null && !Number.isInteger(Number(state.nights))) state.nights = null;
+  else if (state.nights != null) state.nights = Number(state.nights);
+  if (!(["free", "friday-evening", "friday-morning", "any"].includes(state.departure))) state.departure = "free";
+  if (!(["price", "saving", "leave", "nights", "departure"].includes(state.sortBy))) state.sortBy = "saving";
   const all = Object.values(TRIPS).flatMap((k) => data[k] ?? []);
   for (const f of all) f.deal = isDeal(f);
   // Old or first-run data has no historical references yet.  In that case an
@@ -407,6 +444,8 @@ async function start() {
   const maxPrice = Math.ceil(Math.max(...all.map((f) => f.p)) / 10) * 10;
   $("#budget").max = String(Math.max(maxPrice, 30));
   if (state.budget != null && state.budget >= maxPrice) state.budget = null;
+  const availableLeave = data.periodRules?.maxLeave ?? 4;
+  for (const option of $("#maxLeave").options) option.hidden = Number(option.value) > availableLeave;
 
   renderMeta();
   bind();

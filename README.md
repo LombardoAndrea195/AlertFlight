@@ -10,7 +10,7 @@ Ogni due ore controlla **tutti i weekend e i ponti dei prossimi 12 mesi**, cerca
 - **Tipo di viaggio**: andata e ritorno, solo andata (Roma → meta) o solo ritorno (meta → Roma).
 - **Periodi**: ogni weekend o ponte, con la data e le mete più economiche. I prezzi anomali hanno un timbro (verde se trovati nell'ultima ricerca, viola se già segnalati).
 - **Mete**: per ogni destinazione, una barra per ogni periodo dell'anno (più alta = più cara). Così vedi subito quando conviene andarci. Tocca una barra per prenotare.
-- **Filtri**: la pagina apre su **solo weekend**. Puoi includere feste oppure scegliere **Aggiungi ferie** (da 1 a 3 giorni) per cercare ponti prima e dopo weekend e festività; completano la ricerca durata minima, combinazioni vincenti, prezzi anomali, voli diretti, budget e meta/paese. I filtri sono ricordati dal browser.
+- **Filtri**: la pagina apre su **solo weekend**. Con **Weekend e feste** puoi scegliere da zero a quattro giorni di ferie: zero mostra solo weekend e festività, gli altri valori includono i ponti continui realizzabili (anche Natale–Capodanno con quattro ferie). Il filtro **Notti** usa la durata reale del viaggio, non i giorni liberi del periodo. Con **Partenza** indichi se puoi partire solo quando sei già libero, il venerdì sera, il venerdì mattina o in qualsiasi orario. Nella vista **Mete** puoi ordinare per sconto, prezzo, ferie, notti o vicinanza della partenza. Completano la ricerca prezzi anomali, voli diretti, budget e meta/paese. I filtri sono ricordati dal browser.
 
 È HTML/CSS/JS statico in `site/` e non ha bisogno di build. I dati sono in `site/data.json`, generato a ogni esecuzione.
 

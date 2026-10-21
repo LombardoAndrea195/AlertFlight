@@ -1,6 +1,6 @@
 from datetime import date
 
-from voli_alert.__main__ import times_ok
+from voli_alert.__main__ import site_data, times_ok
 from voli_alert.deals import best_per_window_city, new_alerts, reference_prices
 from voli_alert.periods import Window, windows
 from voli_alert.sources import Geo, Offer, _daily, _months
@@ -28,6 +28,21 @@ def test_leave_days_can_extend_a_weekend_on_both_sides():
     assert saturday_to_monday.outbound_dates(True) == [date(2026, 10, 16), date(2026, 10, 17)]
 
 
+def test_friday_morning_to_monday_needs_two_leave_days_but_evening_needs_one():
+    ws = windows(date(2026, 10, 11), 14, 2, "RM")
+    friday_to_monday = next(w for w in ws if w.start == date(2026, 10, 16) and w.end == date(2026, 10, 19))
+    saturday_to_monday = next(w for w in ws if w.start == date(2026, 10, 17) and w.end == date(2026, 10, 19))
+    assert friday_to_monday.leave_days == (date(2026, 10, 16), date(2026, 10, 19))
+    assert saturday_to_monday.leave_days == (date(2026, 10, 19),)
+
+    times = {"day_before_from": "18:00", "first_day_until": "14:00", "return_from": "12:00", "return_until": "23:00"}
+    friday_morning = Offer(friday_to_monday, "BCN", 20, "2026-10-16T10:00", "2026-10-19T18:00", "FCO", "BCN", 0, "FR", "")
+    friday_evening = Offer(saturday_to_monday, "BCN", 20, "2026-10-16T19:00", "2026-10-19T18:00", "FCO", "BCN", 0, "FR", "")
+    assert times_ok(friday_morning, times)
+    assert times_ok(friday_evening, times)
+    assert not times_ok(Offer(saturday_to_monday, "BCN", 20, "2026-10-16T10:00", "2026-10-19T18:00", "FCO", "BCN", 0, "FR", ""), times)
+
+
 def test_tuesday_holiday_becomes_bridge():
     # 8 Dec 2026 is a Tuesday: take Monday off
     w = next(w for w in windows(date(2026, 11, 30), 30, 1, "RM") if w.end == date(2026, 12, 8))
@@ -41,6 +56,33 @@ def test_wednesday_holiday_needs_two_days():
     assert date(2027, 6, 2) not in ends
     ends = [w.end for w in windows(date(2027, 5, 25), 20, 2, "RM")]
     assert date(2027, 6, 6) in ends
+
+
+def test_christmas_to_new_year_uses_four_leave_days():
+    # 25 Dec 2026 and 1 Jan 2027 are Fridays: 28–31 Dec are the only leave days.
+    ws = windows(date(2026, 12, 1), 45, 4, "RM")
+    break_ = next(w for w in ws if w.start == date(2026, 12, 25) and w.end == date(2027, 1, 3))
+    assert break_.leave_days == (
+        date(2026, 12, 28), date(2026, 12, 29), date(2026, 12, 30), date(2026, 12, 31),
+    )
+
+
+def test_site_data_includes_version_summary_and_nights():
+    w = Window(date(2026, 10, 17), date(2026, 10, 19), "Ponte Weekend", (date(2026, 10, 19),))
+    trip = Offer(w, "BCN", 80, "2026-10-16T19:00", "2026-10-19T18:00", "FCO", "BCN", 0, "FR", "")
+    geo = Geo.__new__(Geo)
+    geo.city_name, geo.country_name, geo.city_country = {"BCN": "Barcellona"}, {"ES": "Spagna"}, {"BCN": "ES"}
+    cfg = {
+        "origin_label": "Roma", "horizon_days": 365, "holiday_subdiv": "RM", "max_bridge_days": 4,
+        "times": {"day_before_from": "18:00", "first_day_until": "14:00", "return_from": "12:00", "return_until": "23:00"},
+        "deals": {"discount": 0.5, "min_saving_eur": 15},
+    }
+    trips = {kind: ({("BCN", w.id): trip} if kind == "ar" else {}, {}) for kind in ("ar", "andata", "ritorno")}
+    data = site_data(cfg, [w], trips, [], geo)
+    assert data["schemaVersion"] == 2
+    assert data["summary"]["windows"] == {"total": 1, "byKind": {"ponte": 1}, "byLeaveDays": {"1": 1}}
+    assert data["summary"]["fares"] == {"ar": 1, "andata": 0, "ritorno": 0}
+    assert data["fares"][0]["nights"] == 3
 
 
 def test_keeps_the_plain_weekend_alongside_the_better_bridge():

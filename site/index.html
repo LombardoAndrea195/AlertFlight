@@ -42,6 +42,10 @@
       <svg class="chip" aria-hidden="true"><use href="#i-chip"/></svg>
       <h1 class="cover-title">Voli da Roma<span> nei giorni liberi</span></h1>
       <p class="cover-meta" id="meta">Carico le tariffe…</p>
+      <div class="quick-guide-actions" aria-label="Guida all'uso">
+        <a class="quick-guide" href="guida-rapida.html">Apri la guida <span aria-hidden="true">→</span></a>
+        <a class="quick-guide" href="guida-rapida.pdf" download>Scarica il PDF <span aria-hidden="true">↓</span></a>
+      </div>
     </div>
   </header>
 
@@ -62,29 +66,50 @@
     </label>
     <div class="toggles">
       <label class="toggle"><input type="checkbox" id="onlyDeals"><span>Solo prezzi anomali</span></label>
-      <label class="toggle"><input type="checkbox" id="onlyWinning"><span>Solo combinazioni vincenti</span></label>
       <label class="toggle"><input type="checkbox" id="onlyDirect"><span>Solo diretti</span></label>
     </div>
     <label class="select-filter">Periodo
       <select id="availability">
         <option value="weekends">Solo weekend</option>
-        <option value="natural">Weekend e feste</option>
-        <option value="leave">Aggiungi ferie</option>
+        <option value="holidays">Weekend e feste</option>
       </select>
     </label>
-    <label class="select-filter" id="leaveFilter">Ferie da usare
+    <label class="select-filter" id="leaveFilter" hidden>Ferie da usare
       <select id="maxLeave">
+        <option value="0">Nessun giorno</option>
         <option value="1">Fino a 1 giorno</option>
         <option value="2">Fino a 2 giorni</option>
         <option value="3">Fino a 3 giorni</option>
+        <option value="4">Fino a 4 giorni</option>
       </select>
     </label>
-    <label class="select-filter">Durata
-      <select id="minDays">
-        <option value="2">Qualsiasi</option>
-        <option value="3">Almeno 3 giorni</option>
-        <option value="4">Almeno 4 giorni</option>
-        <option value="5">Almeno 5 giorni</option>
+    <label class="select-filter">Notti
+      <select id="nights">
+        <option value="">Qualsiasi durata</option>
+        <option value="1">1 notte</option>
+        <option value="2">2 notti</option>
+        <option value="3">3 notti</option>
+        <option value="4">4 notti</option>
+        <option value="5">5 notti</option>
+        <option value="6">6 notti</option>
+        <option value="7">7 notti</option>
+      </select>
+    </label>
+    <label class="select-filter">Partenza
+      <select id="departure">
+        <option value="free">Nessun giorno di ferie</option>
+        <option value="friday-evening">Posso partire venerdì sera</option>
+        <option value="friday-morning">Posso partire venerdì mattina</option>
+        <option value="any">Qualsiasi orario</option>
+      </select>
+    </label>
+    <label class="select-filter" id="sortFilter" hidden>Ordina mete per
+      <select id="sortBy">
+        <option value="saving">Maggiore sconto</option>
+        <option value="price">Prezzo più basso</option>
+        <option value="leave">Meno ferie</option>
+        <option value="nights">Più notti</option>
+        <option value="departure">Partenza più vicina</option>
       </select>
     </label>
     <label class="budget">
