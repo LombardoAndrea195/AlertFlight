@@ -381,7 +381,7 @@ function bindPromos() {
     b.t = setTimeout(() => { b.textContent = "Copia link"; }, 1600);
   });
 
-  if (matchMedia("(max-width: 52rem)").matches) {
+  if (window.externalWidgetsEnabled && matchMedia("(max-width: 52rem)").matches) {
     const s = document.createElement("script");
     s.async = true;
     s.charset = "utf-8";
@@ -441,7 +441,7 @@ async function start() {
     state.onlyDeals = false;
     localStorage.setItem(STORE, JSON.stringify(state));
   }
-  const maxPrice = Math.ceil(Math.max(...all.map((f) => f.p)) / 10) * 10;
+  const maxPrice = Math.ceil(all.reduce((max, f) => Math.max(max, f.p), 0) / 10) * 10;
   $("#budget").max = String(Math.max(maxPrice, 30));
   if (state.budget != null && state.budget >= maxPrice) state.budget = null;
   const availableLeave = data.periodRules?.maxLeave ?? 4;
