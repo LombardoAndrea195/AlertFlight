@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Voli da Roma · weekend e ponti</title>
+  <meta name="description" content="Voli da Roma, andata e ritorno o solo andata, per tutti i weekend e i ponti dei prossimi 12 mesi, con i prezzi anomali in evidenza.">
+  <meta name="theme-color" content="#5A1A2B">
+  <meta name="robots" content="noindex">
+  <meta name="google-adsense-account" content="ca-pub-7576464672691797">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="preload" href="fonts/bodoni-moda-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="fonts/red-hat-mono-latin.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="style.css">
+  <script type="module" src="app.js"></script>
+  <script>
+    window.externalWidgetsEnabled = !["localhost", "127.0.0.1", "::1"].includes(location.hostname);
+    if (window.externalWidgetsEnabled) {
+      const widget = document.createElement("script");
+      widget.async = true;
+      widget.dataset.cmpAb = "2";
+      widget.src = "https://emrld.ltd/NTg0NDgw.js?t=584480";
+      document.head.appendChild(widget);
+
+      const ads = document.createElement("script");
+      ads.async = true;
+      ads.crossOrigin = "anonymous";
+      ads.src = "https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7576464672691797";
+      document.head.appendChild(ads);
+    }
+  </script>
+</head>
+<body>
+  <svg class="defs" aria-hidden="true" focusable="false">
+    <filter id="ink" x="-10%" y="-10%" width="120%" height="120%">
+      <feTurbulence type="fractalNoise" baseFrequency=".9" numOctaves="2" seed="7" result="n"/>
+      <feDisplacementMap in="SourceGraphic" in2="n" scale="2.2"/>
+    </filter>
+    <symbol id="i-arrow" viewBox="0 0 16 16"><path d="M5 11 11 5M6 5h5v5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-search" viewBox="0 0 16 16"><g fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><circle cx="7" cy="7" r="4.5"/><path d="m10.5 10.5 3 3"/></g></symbol>
+    <symbol id="i-chip" viewBox="0 0 32 20"><g fill="none" stroke="currentColor" stroke-width="1.6"><rect x="1" y="1" width="30" height="18" rx="2"/><circle cx="16" cy="10" r="5"/><path d="M1 10h10M21 10h10"/></g></symbol>
+  </svg>
+
+  <header class="cover">
+    <svg class="guilloche" id="guilloche" viewBox="0 0 600 600" aria-hidden="true"></svg>
+    <div class="cover-inner">
+      <svg class="chip" aria-hidden="true"><use href="#i-chip"/></svg>
+      <h1 class="cover-title">Voli da Roma<span> nei giorni liberi</span></h1>
+      <p class="cover-meta" id="meta">Carico le tariffe…</p>
+      <div class="quick-guide-actions" aria-label="Guida all'uso">
+        <a class="quick-guide" href="guida-rapida.html">Apri la guida <span aria-hidden="true">→</span></a>
+        <a class="quick-guide" href="guida-rapida.pdf" download>Scarica il PDF <span aria-hidden="true">↓</span></a>
+      </div>
+    </div>
+  </header>
+
+  <form class="controls" id="controls" aria-label="Filtri" onsubmit="return false">
+    <div class="tabs" role="tablist" aria-label="Vista">
+      <button type="button" role="tab" id="tab-periodi" aria-controls="main" aria-selected="true" data-view="periodi">Periodi</button>
+      <button type="button" role="tab" id="tab-mete" aria-controls="main" aria-selected="false" data-view="mete">Mete</button>
+    </div>
+    <div class="segmented" role="radiogroup" aria-label="Tipo di viaggio">
+      <label><input type="radio" name="trip" value="ar" checked><span>Andata e ritorno</span></label>
+      <label><input type="radio" name="trip" value="andata"><span>Solo andata</span></label>
+      <label><input type="radio" name="trip" value="ritorno"><span>Solo ritorno</span></label>
+    </div>
+    <label class="search">
+      <svg aria-hidden="true"><use href="#i-search"/></svg>
+      <span class="sr">Cerca una meta</span>
+      <input type="search" id="q" placeholder="Cerca una meta o un paese" autocomplete="off" spellcheck="false" enterkeyhint="search">
+    </label>
+    <div class="toggles">
+      <label class="toggle"><input type="checkbox" id="onlyDeals"><span>Solo prezzi anomali</span></label>
+      <label class="toggle"><input type="checkbox" id="onlyDirect"><span>Solo diretti</span></label>
+    </div>
+    <label class="select-filter">Periodo
+      <select id="availability">
+        <option value="weekends">Solo weekend</option>
+        <option value="holidays">Weekend e feste</option>
+      </select>
+    </label>
+    <label class="select-filter" id="leaveFilter" hidden>Ferie da usare
+      <select id="maxLeave">
+        <option value="0">Nessun giorno</option>
+        <option value="1">Fino a 1 giorno</option>
+        <option value="2">Fino a 2 giorni</option>
+        <option value="3">Fino a 3 giorni</option>
+        <option value="4">Fino a 4 giorni</option>
+      </select>
+    </label>
+    <label class="select-filter">Notti
+      <select id="nights">
+        <option value="">Qualsiasi durata</option>
+        <option value="1">1 notte</option>
+        <option value="2">2 notti</option>
+        <option value="3">3 notti</option>
+        <option value="4">4 notti</option>
+        <option value="5">5 notti</option>
+        <option value="6">6 notti</option>
+        <option value="7">7 notti</option>
+      </select>
+    </label>
+    <label class="select-filter">Partenza
+      <select id="departure">
+        <option value="free">Nessun giorno di ferie</option>
+        <option value="friday-evening">Posso partire venerdì sera</option>
+        <option value="friday-morning">Posso partire venerdì mattina</option>
+        <option value="any">Qualsiasi orario</option>
+      </select>
+    </label>
+    <label class="select-filter" id="sortFilter" hidden>Ordina mete per
+      <select id="sortBy">
+        <option value="saving">Maggiore sconto</option>
+        <option value="price">Prezzo più basso</option>
+        <option value="leave">Meno ferie</option>
+        <option value="nights">Più notti</option>
+        <option value="departure">Partenza più vicina</option>
+      </select>
+    </label>
+    <label class="budget">
+      <span>Fino a <output id="budgetOut" for="budget">qualsiasi prezzo</output></span>
+      <input type="range" id="budget" min="20" max="1000" step="10" value="1000">
+    </label>
+  </form>
+
+  <main id="main" tabindex="-1" aria-live="polite" aria-busy="true"></main>
+
+  <section class="promos" id="promos" aria-labelledby="promos-title">
+    <h2 class="promos-title" id="promos-title">Codici sconto</h2>
+    <ul class="promo-list">
+      <li class="promo" data-until="2026-10-31">
+        <div class="place">
+          <span class="place-name">intui.travel</span>
+          <span class="place-country">Transfer, qualsiasi data e destinazione</span>
+        </div>
+        <span class="promo-when mono">13 ago – 31 ott 2026</span>
+        <b class="promo-off mono">−5%</b>
+        <div class="promo-actions">
+          <button type="button" class="book" data-copy="https://intui.tpm.li/y1fF4WJI" aria-label="Copia link sconto intui.travel">Copia link</button>
+          <a class="book" href="https://intui.tpm.li/y1fF4WJI" target="_blank" rel="noopener sponsored" aria-label="Apri sconto intui.travel">Apri<svg aria-hidden="true"><use href="#i-arrow"/></svg></a>
+        </div>
+      </li>
+      <li class="promo" data-until="2026-11-30">
+        <div class="place">
+          <span class="place-name">AirHelp</span>
+          <span class="place-country">AirHelp+ Smart e Pro · non valido negli Stati Uniti</span>
+        </div>
+        <span class="promo-when mono">25 giu – 30 nov 2026</span>
+        <b class="promo-off mono">−11%</b>
+        <div class="promo-actions">
+          <button type="button" class="book" data-copy="https://airhelp.tpm.li/xZZ144Lx" aria-label="Copia link sconto AirHelp">Copia link</button>
+          <a class="book" href="https://airhelp.tpm.li/xZZ144Lx" target="_blank" rel="noopener sponsored" aria-label="Apri sconto AirHelp">Apri<svg aria-hidden="true"><use href="#i-arrow"/></svg></a>
+        </div>
+      </li>
+    </ul>
+    <div class="promo-widget" id="promoWidget"></div>
+  </section>
+
+  <footer class="colophon" id="colophon"></footer>
+
+  <div class="tip" id="tip" role="tooltip" hidden></div>
+</body>
+</html>
