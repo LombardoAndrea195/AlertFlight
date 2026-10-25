@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://voli-economici.onrender.com/sitemap.xml

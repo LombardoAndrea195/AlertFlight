@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - run: |
           git config --global user.name "github-actions[bot]"
@@ -28,7 +28,7 @@ jobs:
 
       # Scheduled run (or manual): search fares, send Telegram, write site/data.json
       - if: github.event_name != 'push'
-        uses: astral-sh/setup-uv@v10.3.0
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
 
       - if: github.event_name != 'push'
         run: uv run python -m voli_alert

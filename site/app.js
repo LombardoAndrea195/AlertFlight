@@ -8,6 +8,7 @@ const KIND = { weekend: "Weekend", ponte: "Ponte", festivo: "Festa" };
 const PREVIEW = 8;
 const STORE = "voli-filtri";
 
+const safeUrl = (u) => (/^https:\/\//i.test(String(u ?? "")) ? String(u) : "");
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 const fold = (s) => s.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
 const day = (iso) => { const [y, m, d] = iso.slice(0, 10).split("-").map(Number); return new Date(y, m - 1, d); };
@@ -112,8 +113,9 @@ function fareRow(f, i) {
     ? `<span class="stamp" style="--rot:${rot(f)}deg;--i:${i}" title="${off(f)}% sotto il prezzo tipico${f.n ? ", trovato nell'ultima ricerca" : ""}">
          <b>−${off(f)}%</b><small>${f.n ? "nuovo" : "anomalo"}</small></span>`
     : "";
-  const book = f.l
-    ? `<a class="book" href="${esc(f.l)}" target="_blank" rel="noopener sponsored" aria-label="Prenota ${esc(name)}, ${eur.format(f.p)}">Prenota<svg aria-hidden="true"><use href="#i-arrow"/></svg></a>`
+  const link = safeUrl(f.l);
+  const book = link
+    ? `<a class="book" href="${esc(link)}" target="_blank" rel="noopener sponsored" aria-label="Prenota ${esc(name)}, ${eur.format(f.p)}">Prenota<svg aria-hidden="true"><use href="#i-arrow"/></svg></a>`
     : "";
   return `<li class="${cls}">
     <div class="place"><span class="place-name">${esc(name)}</span><span class="place-country">${esc(country)}</span>${hotelLink(f, name, country)}</div>
@@ -216,7 +218,8 @@ function renderDestinations(fares) {
       const tip = `<b>${rangeTitle(w)}</b>${w.kind !== "weekend" ? ` · ${esc(w.label)}` : ""}<br>${eur.format(f.p)}${f.deal ? ` · −${off(f)}%` : ""}`;
       const label = `${name}, ${rangeTitle(w)}: ${eur.format(f.p)}`;
       const attrs = `class="${cls}" style="--h:${(0.15 + 0.85 * f.p / max).toFixed(3)}" data-tip="${esc(tip)}" aria-label="${esc(label)}"`;
-      return f.l ? `<a ${attrs} href="${esc(f.l)}" target="_blank" rel="noopener"></a>` : `<span ${attrs}></span>`;
+      const link = safeUrl(f.l);
+      return link ? `<a ${attrs} href="${esc(link)}" target="_blank" rel="noopener"></a>` : `<span ${attrs}></span>`;
     });
     return `<li class="dest">
       <div class="place"><span class="place-name">${esc(name)}</span><span class="place-country">${esc(country)}</span></div>
